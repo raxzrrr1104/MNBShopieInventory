@@ -2062,3 +2062,44 @@ async function submitReturnWizard() {
 // Bind to window for dynamic element calls
 window.openBillDetails = openBillDetails;
 window.openReturnWizard = openReturnWizard;
+
+// Clear analytics button handler
+const btnClearAnalyticsBtn = document.getElementById('btnClearAnalyticsBtn');
+if (btnClearAnalyticsBtn) {
+    btnClearAnalyticsBtn.addEventListener('click', async () => {
+        const confirmed = confirm("⚠️ WARNING: This will permanently delete all sales history, bills, line items, and transaction logs. This action cannot be undone.\n\nAre you sure you want to clear all business analytics?");
+        if (!confirmed) return;
+        
+        const doubleCheck = confirm("Double Check: Are you absolutely sure? All data will be deleted permanently.");
+        if (!doubleCheck) return;
+        
+        btnClearAnalyticsBtn.disabled = true;
+        const originalText = btnClearAnalyticsBtn.textContent;
+        btnClearAnalyticsBtn.textContent = 'Clearing Data...';
+        
+        try {
+            const res = await fetch(`${BASE_URL}/api/analytics/clear`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showToast('Analytics and transaction logs cleared successfully!', 'success');
+                // Refresh billing history if currently viewed
+                if (billingHistoryView && billingHistoryView.style.display === 'block') {
+                    fetchBillingHistory();
+                }
+                // Refresh sales metrics on dashboard
+                fetchSalesSummary();
+            } else {
+                showToast(data.error || 'Failed to clear analytics', 'error');
+            }
+        } catch (err) {
+            console.error('Error clearing analytics:', err);
+            showToast('Network error clearing analytics', 'error');
+        } finally {
+            btnClearAnalyticsBtn.disabled = false;
+            btnClearAnalyticsBtn.textContent = originalText;
+        }
+    });
+}

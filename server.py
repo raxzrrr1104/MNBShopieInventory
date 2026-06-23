@@ -2140,6 +2140,32 @@ def save_settings_route():
     except Exception as e:
         logging.error(f"Error saving settings: {e}")
         return jsonify({'success': False, 'message': f'Error saving settings: {str(e)}'}), 500
+
+@app.route('/api/analytics/clear', methods=['POST'])
+def clear_analytics():
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return jsonify({'error': 'Supabase not configured'}), 500
+    try:
+        headers = supabase_headers()
+        # Delete all records from sales table where id is not null
+        res_sales = requests.delete(f"{SUPABASE_URL}/rest/v1/sales?id=not.is.null", headers=headers, timeout=10)
+        if res_sales.status_code not in (200, 204):
+            logging.error(f"Failed to clear sales table: {res_sales.status_code} - {res_sales.text}")
+            
+        # Delete all records from bills table (cascades to bill_items and transaction_logs)
+        res_bills = requests.delete(f"{SUPABASE_URL}/rest/v1/bills?bill_no=not.is.null", headers=headers, timeout=10)
+        if res_bills.status_code not in (200, 204):
+            logging.error(f"Failed to clear bills table: {res_bills.status_code} - {res_bills.text}")
+            
+        return jsonify({
+            'success': True,
+            'message': 'All sales and billing history cleared successfully!',
+            'summary': get_sales_summary_data()
+        })
+    except Exception as e:
+        logging.error(f"Error clearing analytics: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     sales = read_sales()
