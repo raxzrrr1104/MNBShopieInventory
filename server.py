@@ -1219,6 +1219,17 @@ def complete_billing():
 
     updated = False
     total_amount = 0.0
+    net_amount = round(max(0.0, cart_total_price - total_discount), 2)
+    
+    # Generate unique bill number
+    import random
+    import string
+    now = datetime.datetime.now()
+    date_str = now.strftime("%Y-%m-%d %I:%M %p")
+    random_suffix = ''.join(random.choices(string.digits, k=4))
+    bill_no = f"BILL-{now.strftime('%Y%m%d')}-{random_suffix}"
+    
+    bill_items_to_save = []
     
     # Process each cart item with proportional discount
     for item in cart:
@@ -1237,16 +1248,56 @@ def complete_billing():
             if cart_total_price > 0:
                 discount_per_unit = (item_selling_price / cart_total_price) * total_discount
                 sold_price = round(max(0.0, item_selling_price - discount_per_unit), 2)
+                discount_share = round(discount_per_unit, 2)
             else:
                 sold_price = item_selling_price
+                discount_share = 0.0
                 
-            # Record sale with category and average selling price
+            # Record sale for backwards compatibility with existing Business Analytics
             record_sale(prod['name'], prod['sku'], prod.get('intake_price', 0.0), sold_price, qty, prod.get('category', 'General'))
+            
+            # Prepare bill item record
+            bill_items_to_save.append({
+                'bill_no': bill_no,
+                'sku': prod['sku'],
+                'product_name': prod['name'],
+                'quantity': qty,
+                'original_price': item_selling_price,
+                'discount_share': discount_share,
+                'final_sold_price': sold_price,
+                'intake_price': float(prod.get('intake_price', 0.0)),
+                'returned_quantity': 0
+            })
             total_amount += sold_price * qty
             updated = True
             
     if updated:
+        # Write updated inventory
         write_inventory(products)
+        
+        # Save parent bill to Supabase
+        if SUPABASE_URL and SUPABASE_KEY:
+            try:
+                bill_payload = {
+                    'bill_no': bill_no,
+                    'date': date_str,
+                    'customer_email': customer_email,
+                    'total_amount': cart_total_price,
+                    'discount_type': discount_type or 'none',
+                    'discount_value': discount_value,
+                    'net_amount': net_amount,
+                    'status': 'completed'
+                }
+                res_bill = requests.post(f"{SUPABASE_URL}/rest/v1/bills", headers=supabase_headers(), json=bill_payload, timeout=10)
+                if res_bill.status_code not in (200, 201):
+                    logging.error(f"Failed to save parent bill: {res_bill.status_code} - {res_bill.text}")
+                    
+                # Save child bill items to Supabase
+                res_items = requests.post(f"{SUPABASE_URL}/rest/v1/bill_items", headers=supabase_headers(), json=bill_items_to_save, timeout=10)
+                if res_items.status_code not in (200, 201):
+                    logging.error(f"Failed to save bill items: {res_items.status_code} - {res_items.text}")
+            except Exception as e:
+                logging.error(f"Error saving relational bill data: {e}")
         
     email_sent = False
     email_error = None
@@ -1264,11 +1315,291 @@ def complete_billing():
             
     return jsonify({
         'success': True, 
+        'bill_no': bill_no,
         'inventory': get_inventory_response(products),
         'summary': get_sales_summary_data(),
         'email_sent': email_sent,
         'email_error': email_error
     })
+
+@app.route('/api/billing/history', methods=['GET'])
+def get_billing_history():
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return jsonify([])
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/bills?select=*&order=date.desc"
+        res = requests.get(url, headers=supabase_headers(), timeout=10)
+        if res.status_code == 200:
+            return jsonify(res.json())
+        return jsonify({'error': 'Failed to fetch bills'}), res.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/billing/details/<bill_no>', methods=['GET'])
+def get_bill_details(bill_no):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return jsonify({'error': 'Supabase not configured'}), 500
+    try:
+        encoded_bill = urllib.parse.quote(bill_no)
+        # Fetch parent bill
+        res_bill = requests.get(f"{SUPABASE_URL}/rest/v1/bills?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
+        if res_bill.status_code != 200 or not res_bill.json():
+            return jsonify({'error': 'Bill not found'}), 404
+        bill = res_bill.json()[0]
+        
+        # Fetch items
+        res_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
+        items = res_items.json() if res_items.status_code == 200 else []
+        
+        # Fetch logs
+        res_logs = requests.get(f"{SUPABASE_URL}/rest/v1/transaction_logs?parent_bill_no=eq.{encoded_bill}&order=date.desc", headers=supabase_headers(), timeout=10)
+        logs = res_logs.json() if res_logs.status_code == 200 else []
+        
+        return jsonify({
+            'bill': bill,
+            'items': items,
+            'logs': logs
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/billing/refund', methods=['POST'])
+def refund_bill_item():
+    data = request.json or {}
+    bill_no = data.get('bill_no', '').strip()
+    sku = data.get('sku', '').strip()
+    try:
+        qty_to_refund = int(data.get('quantity', 0))
+    except ValueError:
+        return jsonify({'error': 'Invalid quantity'}), 400
+    
+    if not bill_no or not sku or qty_to_refund <= 0:
+        return jsonify({'error': 'Invalid request parameters'}), 400
+        
+    try:
+        # 1. Fetch parent bill
+        encoded_bill = urllib.parse.quote(bill_no)
+        res_bill = requests.get(f"{SUPABASE_URL}/rest/v1/bills?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
+        if res_bill.status_code != 200 or not res_bill.json():
+            return jsonify({'error': 'Bill not found'}), 404
+        bill = res_bill.json()[0]
+        
+        # 2. Fetch target bill item
+        res_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}&sku=eq.{urllib.parse.quote(sku)}", headers=supabase_headers(), timeout=10)
+        if res_items.status_code != 200 or not res_items.json():
+            return jsonify({'error': 'Bill item not found'}), 404
+        item = res_items.json()[0]
+        
+        # Validate return quantity bounds
+        purchased_qty = int(item['quantity'])
+        already_returned = int(item.get('returned_quantity', 0) or 0)
+        if already_returned + qty_to_refund > purchased_qty:
+            return jsonify({'error': f'Cannot refund {qty_to_refund} units. Only {purchased_qty - already_returned} units are remaining.'}), 400
+            
+        # 3. Update bill item's returned quantity
+        new_returned_qty = already_returned + qty_to_refund
+        res_update_item = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/bill_items?id=eq.{item['id']}",
+            headers=supabase_headers(),
+            json={'returned_quantity': new_returned_qty},
+            timeout=10
+        )
+        if res_update_item.status_code not in (200, 204):
+            return jsonify({'error': 'Failed to update bill item'}), 500
+            
+        # 4. Increment stock level in inventory
+        products = read_inventory()
+        prod = next((p for p in products if p['sku'] == sku), None)
+        if prod:
+            prod['quantity'] = prod['quantity'] + qty_to_refund
+            write_inventory(products)
+            
+        # 5. Insert transaction log audit
+        now = datetime.datetime.now()
+        date_str = now.strftime("%Y-%m-%d %I:%M %p")
+        refund_amount = round(float(item['final_sold_price']) * qty_to_refund, 2)
+        log_payload = {
+            'parent_bill_no': bill_no,
+            'type': 'refund',
+            'date': date_str,
+            'items_involved': [{'sku': sku, 'product_name': item['product_name'], 'quantity': qty_to_refund, 'action': 'refunded'}],
+            'cash_delta': -refund_amount
+        }
+        requests.post(f"{SUPABASE_URL}/rest/v1/transaction_logs", headers=supabase_headers(), json=log_payload, timeout=10)
+        
+        # 6. Append negative sale entry to sales table for analytics compatibility
+        record_sale(
+            f"REFUND: {item['product_name']}",
+            sku,
+            float(item.get('intake_price', 0.0) or 0.0),
+            float(item['final_sold_price']),
+            -qty_to_refund,
+            prod.get('category', 'General') if prod else 'General'
+        )
+        
+        # 7. Recalculate bill status (check if fully refunded or partially refunded)
+        res_all_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
+        all_items = res_all_items.json() if res_all_items.status_code == 200 else []
+        
+        all_fully_returned = True
+        any_returned = False
+        for it in all_items:
+            ret = int(it.get('returned_quantity', 0) or 0)
+            pur = int(it['quantity'])
+            if ret > 0:
+                any_returned = True
+            if ret < pur:
+                all_fully_returned = False
+                
+        new_status = 'refunded' if all_fully_returned else ('partially_refunded' if any_returned else 'completed')
+        
+        # Update bill status
+        requests.patch(
+            f"{SUPABASE_URL}/rest/v1/bills?bill_no=eq.{encoded_bill}",
+            headers=supabase_headers(),
+            json={'status': new_status},
+            timeout=10
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Refund completed successfully',
+            'inventory': get_inventory_response(products),
+            'summary': get_sales_summary_data()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/billing/exchange', methods=['POST'])
+def exchange_bill_item():
+    data = request.json or {}
+    bill_no = data.get('bill_no', '').strip()
+    returned_sku = data.get('returned_sku', '').strip()
+    try:
+        returned_qty = int(data.get('returned_quantity', 0))
+        exchanged_qty = int(data.get('exchanged_quantity', 0))
+    except ValueError:
+        return jsonify({'error': 'Invalid quantities'}), 400
+    exchanged_sku = data.get('exchanged_sku', '').strip()
+    
+    if not bill_no or not returned_sku or returned_qty <= 0 or not exchanged_sku or exchanged_qty <= 0:
+        return jsonify({'error': 'Invalid request parameters'}), 400
+        
+    try:
+        encoded_bill = urllib.parse.quote(bill_no)
+        # 1. Fetch parent bill
+        res_bill = requests.get(f"{SUPABASE_URL}/rest/v1/bills?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
+        if res_bill.status_code != 200 or not res_bill.json():
+            return jsonify({'error': 'Bill not found'}), 404
+        bill = res_bill.json()[0]
+        
+        # 2. Fetch returned bill item
+        res_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}&sku=eq.{urllib.parse.quote(returned_sku)}", headers=supabase_headers(), timeout=10)
+        if res_items.status_code != 200 or not res_items.json():
+            return jsonify({'error': 'Purchased item not found in bill'}), 404
+        ret_item = res_items.json()[0]
+        
+        # Validate returned bounds
+        already_returned = int(ret_item.get('returned_quantity', 0) or 0)
+        if already_returned + returned_qty > int(ret_item['quantity']):
+            return jsonify({'error': 'Quantity to exchange exceeds purchased limits.'}), 400
+            
+        products = read_inventory()
+        # 3. Fetch exchanged product from inventory
+        exch_prod = next((p for p in products if p['sku'] == exchanged_sku), None)
+        if not exch_prod:
+            return jsonify({'error': 'Exchanged product not found in inventory'}), 404
+            
+        if exch_prod['quantity'] < exchanged_qty:
+            return jsonify({'error': f'Not enough stock for exchange. Only {exch_prod["quantity"]} units available.'}), 400
+            
+        # 4. Perform stock movements
+        ret_prod = next((p for p in products if p['sku'] == returned_sku), None)
+        if ret_prod:
+            ret_prod['quantity'] = ret_prod['quantity'] + returned_qty
+        exch_prod['quantity'] = exch_prod['quantity'] - exchanged_qty
+        write_inventory(products)
+        
+        # 5. Update returned item's returned_quantity
+        requests.patch(
+            f"{SUPABASE_URL}/rest/v1/bill_items?id=eq.{ret_item['id']}",
+            headers=supabase_headers(),
+            json={'returned_quantity': already_returned + returned_qty},
+            timeout=10
+        )
+        
+        # 6. Insert exchanged item into bill_items
+        exch_original_price = float(exch_prod['selling_price'])
+        exch_final_price = exch_original_price
+        
+        exch_item_payload = {
+            'bill_no': bill_no,
+            'sku': exchanged_sku,
+            'product_name': f"EXCHANGE: {exch_prod['name']}",
+            'quantity': exchanged_qty,
+            'original_price': exch_original_price,
+            'discount_share': 0.0,
+            'final_sold_price': exch_final_price,
+            'intake_price': float(exch_prod.get('intake_price', 0.0) or 0.0),
+            'returned_quantity': 0
+        }
+        requests.post(f"{SUPABASE_URL}/rest/v1/bill_items", headers=supabase_headers(), json=exch_item_payload, timeout=10)
+        
+        # 7. Calculate cash delta
+        value_returned = round(float(ret_item['final_sold_price']) * returned_qty, 2)
+        value_issued = round(exch_final_price * exchanged_qty, 2)
+        cash_delta = round(value_issued - value_returned, 2)
+        
+        # 8. Log the transaction
+        now = datetime.datetime.now()
+        date_str = now.strftime("%Y-%m-%d %I:%M %p")
+        log_payload = {
+            'parent_bill_no': bill_no,
+            'type': 'exchange',
+            'date': date_str,
+            'items_involved': [
+                {'sku': returned_sku, 'product_name': ret_item['product_name'], 'quantity': returned_qty, 'action': 'returned'},
+                {'sku': exchanged_sku, 'product_name': exch_prod['name'], 'quantity': exchanged_qty, 'action': 'issued'}
+            ],
+            'cash_delta': cash_delta
+        }
+        requests.post(f"{SUPABASE_URL}/rest/v1/transaction_logs", headers=supabase_headers(), json=log_payload, timeout=10)
+        
+        # 9. Log transactions to sales table for analytics compatibility
+        record_sale(
+            f"REFUND: {ret_item['product_name']}",
+            returned_sku,
+            float(ret_item.get('intake_price', 0.0) or 0.0),
+            float(ret_item['final_sold_price']),
+            -returned_qty,
+            ret_prod.get('category', 'General') if ret_prod else 'General'
+        )
+        record_sale(
+            f"EXCHANGE: {exch_prod['name']}",
+            exchanged_sku,
+            float(exch_prod.get('intake_price', 0.0) or 0.0),
+            exch_final_price,
+            exchanged_qty,
+            exch_prod.get('category', 'General') or 'General'
+        )
+        
+        # Update bill status & net_amount
+        new_net = round(float(bill['net_amount']) + cash_delta, 2)
+        requests.patch(
+            f"{SUPABASE_URL}/rest/v1/bills?bill_no=eq.{encoded_bill}",
+            headers=supabase_headers(),
+            json={'net_amount': new_net, 'status': 'partially_refunded'},
+            timeout=10
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Exchange completed successfully',
+            'inventory': get_inventory_response(products),
+            'summary': get_sales_summary_data()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 def get_sales_summary_data(date_str=None):
     """Computes today's (or given date's) and all-time sales metrics from Supabase sales table."""

@@ -25,7 +25,8 @@
             </div>
             
             <div class="nav-links">
-                <a href="/" class="nav-link active">Stock Dashboard</a>
+                <a href="#" class="nav-link active" id="navStockBtn">Stock Dashboard</a>
+                <a href="#" class="nav-link" id="navBillingBtn">Billing & Refunds</a>
                 <a href="/analytics.html" class="nav-link">Business Analytics</a>
                 <a href="/logout" class="nav-link text-red">Logout</a>
             </div>
@@ -47,8 +48,10 @@
 
         <!-- Main Content Area -->
         <main class="main-content">
-            <!-- Header Section -->
-            <header class="page-header" style="align-items: flex-start;">
+            <!-- Stock Dashboard View -->
+            <div id="stockDashboardView">
+                <!-- Header Section -->
+                <header class="page-header" style="align-items: flex-start;">
                 <div class="header-titles">
                     <div class="welcome-banner" style="display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1rem; flex-wrap: wrap;">
                         <img src="image.png" alt="MNB Shopie Logo" style="height: 72px; width: auto; border-radius: var(--radius-md); box-shadow: var(--shadow-card); border: 2px solid var(--border-light);">
@@ -387,6 +390,58 @@
                     </div>
                 </form>
             </section>
+            </div>
+
+            <!-- Billing History View -->
+            <div id="billingHistoryView" style="display: none;">
+                <header class="page-header" style="align-items: flex-start;">
+                    <div class="header-titles">
+                        <h2 style="font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); margin: 0;">Billing & Refunds</h2>
+                        <p class="header-subtitle" style="margin-left: 0.25rem; font-size: 0.9rem; color: var(--text-secondary);">Search billing transactions, track return history, and process exchanges.</p>
+                    </div>
+                </header>
+                
+                <!-- Search & Filters -->
+                <div class="glass-panel" style="padding: 1.25rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px;">
+                        <input type="text" class="input-field" id="searchBillInput" placeholder="Search by Bill No, Customer Email..." style="width: 100%;">
+                    </div>
+                    <div style="width: 180px;">
+                        <select class="input-field" id="filterBillStatus" style="width: 100%;">
+                            <option value="all">All Statuses</option>
+                            <option value="completed">Completed</option>
+                            <option value="partially_refunded">Partially Returned</option>
+                            <option value="refunded">Fully Refunded</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-outline" id="btnRefreshBills" style="height: 38px;">
+                        Refresh List
+                    </button>
+                </div>
+                
+                <!-- Bills List -->
+                <div class="table-container glass-panel" style="padding: 0; overflow: hidden; border: 1px solid var(--border-light); border-radius: var(--radius-md);">
+                    <div style="overflow-x: auto;">
+                        <table class="inventory-table" id="billsTable" style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th>Bill No</th>
+                                    <th>Date</th>
+                                    <th>Customer Email</th>
+                                    <th style="text-align: right;">Total Amount</th>
+                                    <th style="text-align: right;">Discount</th>
+                                    <th style="text-align: right;">Net Amount</th>
+                                    <th style="text-align: center;">Status</th>
+                                    <th style="text-align: center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="billsTableBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -618,6 +673,118 @@
                     Print / Save PDF
                 </button>
                 <button class="btn btn-primary" id="btnDismissBarcodesSheet">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bill Details Modal -->
+    <div class="modal-backdrop" id="billDetailsModal">
+        <div class="modal-box glass-panel" style="max-width: 750px; width: 90%;">
+            <div class="modal-header">
+                <h3 id="detailsBillNo" style="margin: 0;">Bill Details</h3>
+                <button class="close-btn" id="closeBillDetailsModal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">×</button>
+            </div>
+            <div style="margin-top: 1rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; font-size: 0.9rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-light); padding-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div>Date: <span id="detailsBillDate" style="color: var(--text-primary); font-weight: 600;">—</span></div>
+                <div>Customer: <span id="detailsBillCustomer" style="color: var(--text-primary); font-weight: 600;">—</span></div>
+                <div>Status: <span id="detailsBillStatus" style="font-weight: 700;">—</span></div>
+            </div>
+            
+            <h4 style="margin-bottom: 0.5rem; font-size: 1rem; color: var(--text-primary);">Purchased Items</h4>
+            <div style="overflow-x: auto; margin-bottom: 1.5rem; border: 1px solid var(--border-light); border-radius: var(--radius-sm);">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; text-align: left;">
+                    <thead style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                        <tr>
+                            <th style="padding: 0.75rem;">Product</th>
+                            <th style="padding: 0.75rem;">SKU</th>
+                            <th style="padding: 0.75rem; text-align: right;">Price</th>
+                            <th style="padding: 0.75rem; text-align: center;">Qty</th>
+                            <th style="padding: 0.75rem; text-align: center;">Returned</th>
+                            <th style="padding: 0.75rem; text-align: center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailsItemsBody">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 1.5rem; font-size: 0.95rem; line-height: 1.6;">
+                <div style="text-align: right; width: 250px;">
+                    <div>Gross Total: <span id="detailsBillTotal" style="font-weight: 600;">$0.00</span></div>
+                    <div>Discount applied: <span id="detailsBillDiscount" style="font-weight: 600; color: var(--accent-red);">-$0.00</span></div>
+                    <div style="font-size: 1.1rem; font-weight: 800; border-top: 1px solid var(--border-light); margin-top: 0.5rem; padding-top: 0.25rem;">Net Paid: <span id="detailsBillNet">$0.00</span></div>
+                </div>
+            </div>
+            
+            <div id="detailsLogsSection" style="display: none; margin-top: 1rem;">
+                <h4 style="margin-bottom: 0.5rem; font-size: 1rem; color: var(--text-primary);">Return/Exchange Activity Log</h4>
+                <div style="overflow-y: auto; max-height: 150px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 0.75rem; background: var(--bg-secondary); font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);" id="detailsLogsBody">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            
+            <div class="modal-actions" style="margin-top: 1.5rem;">
+                <button class="btn btn-primary" id="btnDismissBillDetails">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Return Wizard Modal -->
+    <div class="modal-backdrop" id="returnWizardModal">
+        <div class="modal-box glass-panel" style="max-width: 500px; width: 90%;">
+            <div class="modal-header">
+                <h3 style="margin: 0;">Process Return / Exchange</h3>
+                <button class="close-btn" id="closeReturnWizardModal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">×</button>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; margin-top: 1rem; font-size: 0.9rem; border: 1px solid var(--border-light);">
+                <div>Item: <strong id="wizardItemName" style="color: var(--text-primary);">—</strong></div>
+                <div>Purchased Qty: <span id="wizardItemPurchased" style="font-weight: 600;">0</span> | Already Returned: <span id="wizardItemReturned" style="font-weight: 600; color: var(--accent-red);">0</span></div>
+                <div>Effective Paid Unit Price: <strong id="wizardItemPrice">—</strong></div>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Quantity to Return</label>
+                <input type="number" class="input-field" id="wizardReturnQty" min="1" value="1" style="width: 100%;">
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Return Action</label>
+                <div style="display: flex; gap: 1.5rem; margin-top: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem;">
+                        <input type="radio" name="wizardActionType" value="refund" checked style="accent-color: var(--primary);">
+                        Refund Cash
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem;">
+                        <input type="radio" name="wizardActionType" value="exchange" style="accent-color: var(--primary);">
+                        Exchange for Product
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Exchange Fields (Toggled) -->
+            <div id="wizardExchangeFields" style="display: none; border-top: 1px solid var(--border-light); padding-top: 1rem; margin-top: 1rem;">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Search Exchange Replacement Product</label>
+                    <select class="input-field" id="wizardExchangeProductSelect" style="width: 100%; height: 38px;">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Exchange Quantity</label>
+                    <input type="number" class="input-field" id="wizardExchangeQty" min="1" value="1" style="width: 100%;">
+                </div>
+                <div style="background: rgba(14, 165, 233, 0.05); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-light); font-size: 0.9rem; margin-top: 0.5rem;">
+                    <div>Replacement Unit Price: <span id="wizardExchangeUnitPrice" style="font-weight: 600;">$0.00</span></div>
+                    <div style="font-weight: 700; color: var(--text-primary); margin-top: 0.25rem;" id="wizardExchangeDifference">
+                        Cash Balance Adjustment: $0.00
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-actions" style="margin-top: 1.5rem;">
+                <button class="btn btn-outline" id="btnCancelReturnWizard">Cancel</button>
+                <button class="btn btn-primary" id="btnSubmitReturnWizard">Submit Transaction</button>
             </div>
         </div>
     </div>
