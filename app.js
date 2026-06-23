@@ -2000,7 +2000,7 @@ async function submitReturnWizard() {
                 
                 // Sync local state
                 inventory = data.inventory || inventory;
-                updateInventoryTable();
+                renderInventory();
                 fetchBillingHistory();
             } else {
                 showToast(data.error || 'Failed to process refund', 'error');
@@ -2044,7 +2044,7 @@ async function submitReturnWizard() {
                 
                 // Sync local state
                 inventory = data.inventory || inventory;
-                updateInventoryTable();
+                renderInventory();
                 fetchBillingHistory();
             } else {
                 showToast(data.error || 'Failed to process exchange', 'error');
