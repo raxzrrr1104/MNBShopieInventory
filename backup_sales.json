@@ -1,0 +1,46 @@
+[
+    {
+        "id": 1,
+        "date": "2026-06-24 03:09 AM",
+        "product_name": "Lenovo Smart Clock Essential (CD-4N341Y)",
+        "sku": "LENSMACLO-9937",
+        "intake": 1000.0,
+        "sold_price": 1100.0,
+        "profit": 200.0,
+        "quantity": 2,
+        "category": "General"
+    },
+    {
+        "id": 2,
+        "date": "2026-06-24 03:09 AM",
+        "product_name": "Nivea Men Fresh Active Deodorant, 150 ml",
+        "sku": "NIVMENFRE-9396",
+        "intake": 80.0,
+        "sold_price": 180.0,
+        "profit": 100.0,
+        "quantity": 1,
+        "category": "General"
+    },
+    {
+        "id": 4,
+        "date": "2026-06-24 03:24 AM",
+        "product_name": "Lenovo Smart Clock Essential (CD-4N341Y)",
+        "sku": "LENSMACLO-9937",
+        "intake": 1000.0,
+        "sold_price": 1260.0,
+        "profit": 260.0,
+        "quantity": 1,
+        "category": "Electronics"
+    },
+    {
+        "id": 3,
+        "date": "2026-06-24 03:24 AM",
+        "product_name": "Nivea Men Fresh Active Deodorant, 150 ml",
+        "sku": "NIVMENFRE-9396",
+        "intake": 80.0,
+        "sold_price": 180.0,
+        "profit": 100.0,
+        "quantity": 1,
+        "category": "General"
+    }
+]

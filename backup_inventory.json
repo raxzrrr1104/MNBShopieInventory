@@ -1,0 +1,32 @@
+[
+    {
+        "sku": "NIVMENFRE-3159",
+        "barcode": "8904256002820",
+        "name": "Nivea Men Fresh Active Deodorant, 150 ml",
+        "quantity": 11,
+        "image_url": "http://www.smallflower.com/cdn/shop/files/nivea-men-fresh-active-spray-deo-1.png?v=1781797908",
+        "intake_price": 100.0,
+        "category": "Perfumes",
+        "selling_price": 150.0
+    },
+    {
+        "sku": "PEPINCPEP-3216",
+        "barcode": "8902080001828",
+        "name": "PepsiCo Inc. Pepsi Zero Sugar (400ml)",
+        "quantity": 1,
+        "image_url": "https://instamart-media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_1200,h_630/NI_CATALOG/IMAGES/CIW/2026/4/13/13aa8088-e364-489e-a1fc-72e437f164a3_5ZV9YCK40S_tagged.png",
+        "intake_price": 10.0,
+        "category": "Beverages",
+        "selling_price": 20.0
+    },
+    {
+        "sku": "MAN-UYLUE1",
+        "barcode": "999611924270",
+        "name": "Magic Mouse",
+        "quantity": 1,
+        "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRy4qmZvGEN9X8rJUux_pYex2p0tp5V7B8pBA&s",
+        "intake_price": 8000.0,
+        "category": "Electronics",
+        "selling_price": 8900.0
+    }
+]

@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MNB Shopie — Business Analytics & Insights</title>
+    <meta name="description" content="Business analytics, sales metrics, and profit insights for MNB Shopie inventory and billing management system.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="topbar">
+        <div class="topbar-inner">
+            <div class="brand" style="gap: 0.75rem;">
+                <img src="image.png" alt="MNB Shopie Logo" style="height: 32px; width: auto; border-radius: var(--radius-sm);">
+                <h1 style="font-size: 1.25rem;">MNB Shopie</h1>
+                <span class="version-badge" style="background: var(--primary-light); color: var(--primary); font-weight: 700;">System</span>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Stock Dashboard</a>
+                <a href="/analytics.html" class="nav-link active">Business Analytics</a>
+                <a href="/logout" class="nav-link text-red">Logout</a>
+            </div>
+            <div class="topbar-right">
+                <div class="network-badge" id="networkBadge">
+                    <span class="net-dot"></span>
+                    <span class="net-label" id="networkLabel">Detecting network...</span>
+                </div>
+                <div class="ip-display" id="ipDisplay">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                    <span id="ipText">—</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="analytics-container">
+        <!-- KPI Metrics Grid -->
+        <section class="kpi-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem;">
+            <!-- Gross Revenue -->
+            <div class="analytics-card">
+                <div class="accent-bar accent-blue"></div>
+                <div class="kpi-title">Gross Revenue</div>
+                <div class="kpi-value-large" id="kpiRevenue">Rs. 0.00</div>
+                <div class="kpi-desc">Total sales checkout volume</div>
+            </div>
+
+            <!-- Net Profit -->
+            <div class="analytics-card">
+                <div class="accent-bar accent-emerald"></div>
+                <div class="kpi-title">Net Profit</div>
+                <div class="kpi-value-large text-green" id="kpiProfit">Rs. 0.00</div>
+                <div class="kpi-desc">Revenue minus product intake cost</div>
+            </div>
+
+            <!-- Items Sold -->
+            <div class="analytics-card">
+                <div class="accent-bar accent-indigo"></div>
+                <div class="kpi-title">Items Sold</div>
+                <div class="kpi-value-large" id="kpiSoldQty">0</div>
+                <div class="kpi-desc">Volume of physical items processed</div>
+            </div>
+
+            <!-- Profit Margin -->
+            <div class="analytics-card">
+                <div class="accent-bar accent-amber"></div>
+                <div class="kpi-title">Profit Margin</div>
+                <div class="kpi-value-large" id="kpiMargin">0.0%</div>
+                <div class="kpi-desc">Average net profitability ratio</div>
+            </div>
+        </section>
+
+        <!-- Main Dashboard Layout -->
+        <main class="analytics-grid">
+            <!-- Left Side: Interactive Graphs -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <section class="analytics-card chart-card">
+                    <div class="section-header">
+                        <h3>Revenue & Net Profit Trend</h3>
+                    </div>
+                    <p class="card-hint" style="margin-bottom:1rem;">Daily timeline of business revenue stream and net profit growth.</p>
+                    <div class="chart-wrap" style="height: 320px; position: relative;">
+                        <canvas id="salesTrendChart"></canvas>
+                    </div>
+                </section>
+                
+                <div class="charts-row">
+                    <!-- Top Products Chart -->
+                    <section class="analytics-card chart-card chart-box">
+                        <div class="section-header">
+                            <h3>Top Performing Products</h3>
+                        </div>
+                        <p class="card-hint" style="margin-bottom:1rem;">Top products ranked by gross sales turnover.</p>
+                        <div class="chart-wrap" style="flex: 1; min-height: 240px; position: relative;">
+                            <canvas id="topProductsChart"></canvas>
+                        </div>
+                    </section>
+                    
+                    <!-- Profit Share Chart -->
+                    <section class="analytics-card chart-card chart-box">
+                        <div class="section-header">
+                            <h3>Profit Contribution</h3>
+                        </div>
+                        <p class="card-hint" style="margin-bottom:1rem;">Product share percentage contribution to net profit.</p>
+                        <div class="chart-wrap" style="flex: 1; min-height: 240px; position: relative;">
+                            <canvas id="profitShareChart"></canvas>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Right Side: Sidebar Sales Feed -->
+            <aside class="sidebar" style="margin-top: 0;">
+                <section class="analytics-card" style="height: 100%; display: flex; flex-direction: column; min-height: 755px;">
+                    <div class="section-header">
+                        <h3>Recent Sales Feed</h3>
+                        <button class="btn btn-outline btn-xs" id="exportSalesBtn">Export CSV</button>
+                    </div>
+                    <p class="card-hint" style="margin-bottom: 1rem;">Chronological billing logs tracked in real-time.</p>
+                    <div style="flex: 1; overflow-y: auto;" id="salesLogContainer" class="recent-sales-list">
+                        <!-- Populated dynamically -->
+                        <div class="empty-state" style="padding: 4rem 0;" id="emptySalesLog">
+                            <p style="color: var(--text-tertiary);">No sales transactions recorded yet.</p>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+            
+            <!-- Full Width Detailed Transaction Grid -->
+            <section class="analytics-card table-card full-width-card">
+                <div class="card-header-with-actions">
+                    <h2>Transaction Breakdown</h2>
+                    <div class="search-wrap" style="margin-bottom: 0;">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                        <input type="text" id="salesSearchInput" placeholder="Search product name or SKU…">
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Product Name</th>
+                                <th>SKU</th>
+                                <th style="text-align: right;">Intake Cost</th>
+                                <th style="text-align: right;">Sold Price</th>
+                                <th style="text-align: right;">Quantity</th>
+                                <th style="text-align: right;">Total Revenue</th>
+                                <th style="text-align: right;">Net Profit</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salesTableBody">
+                            <!-- Filled dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer style="text-align: center; padding: 2rem 1rem 1rem; font-size: 0.65rem; color: var(--text-tertiary); opacity: 0.25; font-weight: 500; text-transform: lowercase; clear: both;">
+        made with &lt;3 by mohit sherkhane
+    </footer>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast">Updated</div>
+
+    <script>
+        // --- Trusted Types Policy ---
+        if (window.trustedTypes && window.trustedTypes.createPolicy) {
+            if (!window.trustedTypes.defaultPolicy) {
+                window.trustedTypes.createPolicy('default', {
+                    createHTML: (string) => string
+                });
+            }
+        }
+
+        const BASE_URL = window.location.origin;
+        let analyticsData = {};
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchNetworkInfo();
+            loadAnalyticsData();
+            
+            document.getElementById('salesSearchInput').addEventListener('input', filterSalesTable);
+            document.getElementById('exportSalesBtn').addEventListener('click', () => {
+                window.location.href = `${BASE_URL}/api/sales/export`;
+            });
+        });
+        
+        async function fetchNetworkInfo() {
+            try {
+                const res = await fetch(`${BASE_URL}/api/network-info`);
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('networkLabel').textContent = `Online · ${data.ip}`;
+                    document.getElementById('ipText').textContent = data.mobile_url;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        
+        async function loadAnalyticsData() {
+            try {
+                const res = await fetch(`${BASE_URL}/api/analytics`);
+                if (!res.ok) throw new Error('Analytics failed');
+                
+                analyticsData = await res.json();
+                renderKPIs(analyticsData.summary);
+                renderSalesTrendChart(analyticsData.timeline);
+                renderTopProductsChart(analyticsData.products);
+                renderProfitShareChart(analyticsData.products);
+                renderSalesLogs(analyticsData.timeline);
+                renderSalesTable(analyticsData.products, analyticsData.timeline);
+            } catch (err) {
+                console.error('Error loading analytics:', err);
+                showToast('Failed to load analytical data', 'error');
+            }
+        }
+        
+        function renderKPIs(summary) {
+            document.getElementById('kpiRevenue').textContent = `Rs. ${summary.total_revenue.toFixed(2)}`;
+            document.getElementById('kpiProfit').textContent = `Rs. ${summary.total_profit.toFixed(2)}`;
+            document.getElementById('kpiSoldQty').textContent = summary.total_items_sold;
+            document.getElementById('kpiMargin').textContent = `${summary.margin.toFixed(1)}%`;
+        }
+        
+        let salesTrendChartInstance = null;
+        function renderSalesTrendChart(timeline) {
+            const ctx = document.getElementById('salesTrendChart').getContext('2d');
+            if (timeline.length === 0) return;
+            
+            const labels = timeline.map(t => t.date);
+            const revenues = timeline.map(t => t.revenue);
+            const profits = timeline.map(t => t.profit);
+            
+            if (salesTrendChartInstance) salesTrendChartInstance.destroy();
+            
+            salesTrendChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Revenue',
+                            data: revenues,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.04)',
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 3,
+                            pointBackgroundColor: '#3b82f6',
+                            pointHoverRadius: 6
+                        },
+                        {
+                            label: 'Net Profit',
+                            data: profits,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.04)',
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 3,
+                            pointBackgroundColor: '#10b981',
+                            pointHoverRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'top', 
+                            labels: { 
+                                font: { family: 'Inter', size: 12, weight: '500' },
+                                usePointStyle: true,
+                                padding: 15
+                            } 
+                        },
+                        tooltip: {
+                            padding: 12,
+                            titleFont: { family: 'Inter', size: 13, weight: '600' },
+                            bodyFont: { family: 'Inter', size: 12 },
+                            backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.dataset.label}: Rs. ${context.raw.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { 
+                                callback: value => 'Rs. ' + value,
+                                font: { family: 'Inter', size: 11 }
+                            },
+                            grid: { color: 'rgba(226, 232, 240, 0.6)' }
+                        },
+                        x: {
+                            ticks: { font: { family: 'Inter', size: 11 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+        
+        let topProductsChartInstance = null;
+        function renderTopProductsChart(products) {
+            const ctx = document.getElementById('topProductsChart').getContext('2d');
+            if (products.length === 0) return;
+            
+            const top5 = products.slice(0, 5);
+            const labels = top5.map(p => p.name.length > 20 ? p.name.substring(0, 17) + '...' : p.name);
+            const values = top5.map(p => p.revenue);
+            
+            if (topProductsChartInstance) topProductsChartInstance.destroy();
+            
+            topProductsChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Gross Sales',
+                        data: values,
+                        backgroundColor: '#6366f1',
+                        borderRadius: 6,
+                        hoverBackgroundColor: '#4f46e5'
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` Gross Sales: Rs. ${context.raw.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { 
+                                callback: val => 'Rs. ' + val,
+                                font: { family: 'Inter', size: 10 }
+                            }, 
+                            grid: { color: 'rgba(226, 232, 240, 0.6)' } 
+                        },
+                        y: { 
+                            ticks: { font: { family: 'Inter', size: 10 } },
+                            grid: { display: false } 
+                        }
+                    }
+                }
+            });
+        }
+        
+        let profitShareChartInstance = null;
+        function renderProfitShareChart(products) {
+            const ctx = document.getElementById('profitShareChart').getContext('2d');
+            const profitable = products.filter(p => p.profit > 0).slice(0, 4);
+            if (profitable.length === 0) return;
+            
+            const labels = profitable.map(p => p.name.length > 15 ? p.name.substring(0, 12) + '...' : p.name);
+            const values = profitable.map(p => p.profit);
+            
+            if (profitShareChartInstance) profitShareChartInstance.destroy();
+            
+            profitShareChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'bottom', 
+                            labels: { 
+                                usePointStyle: true, 
+                                font: { family: 'Inter', size: 10, weight: '500' },
+                                padding: 12
+                            } 
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` Net Profit: Rs. ${context.raw.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+        
+        function renderSalesLogs(timeline) {
+            const container = document.getElementById('salesLogContainer');
+            const empty = document.getElementById('emptySalesLog');
+            
+            let allSales = [];
+            timeline.forEach(t => {
+                (t.sales || []).forEach(s => {
+                    allSales.push({ ...s, date: t.date });
+                });
+            });
+            
+            allSales.reverse();
+            
+            if (allSales.length === 0) {
+                empty.style.display = 'flex';
+                return;
+            }
+            empty.style.display = 'none';
+            
+            container.innerHTML = '';
+            allSales.slice(0, 10).forEach(sale => {
+                const item = document.createElement('div');
+                item.className = 'sale-log-item';
+                item.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:160px;">${sale.product_name}</span>
+                        <span style="font-weight:700; color:#10b981; font-size:0.85rem;">+Rs. ${(sale.sold_price * sale.quantity).toFixed(2)}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.72rem; color:var(--text-tertiary);">
+                        <span>Qty: ${sale.quantity} · Profit: Rs. ${sale.profit.toFixed(2)}</span>
+                        <span>${sale.date}${sale.time ? ' ' + sale.time : ''}</span>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+        
+        let salesTableRowsData = [];
+        
+        function renderSalesTable(products, timeline) {
+            const tbody = document.getElementById('salesTableBody');
+            tbody.innerHTML = '';
+            
+            salesTableRowsData = [];
+            timeline.forEach(t => {
+                (t.sales || []).forEach(s => {
+                    salesTableRowsData.push({
+                        date: t.date,
+                        time: s.time,
+                        name: s.product_name,
+                        sku: s.sku,
+                        intake: s.intake,
+                        sold_price: s.sold_price,
+                        quantity: s.quantity,
+                        revenue: s.sold_price * s.quantity,
+                        profit: s.profit
+                    });
+                });
+            });
+            
+            salesTableRowsData.reverse();
+            populateTable(salesTableRowsData);
+        }
+        
+        function populateTable(rows) {
+            const tbody = document.getElementById('salesTableBody');
+            tbody.innerHTML = '';
+            
+            if (rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-tertiary);">No matching sales transactions.</td></tr>`;
+                return;
+            }
+            
+            rows.forEach(r => {
+                const tr = document.createElement('tr');
+                const displayDate = r.time ? `${r.date} ${r.time}` : r.date;
+                tr.innerHTML = `
+                    <td><code>${displayDate}</code></td>
+                    <td><strong style="color:var(--text-primary);">${r.name}</strong></td>
+                    <td><span class="sku-mono">${r.sku}</span></td>
+                    <td style="text-align: right;">Rs. ${r.intake.toFixed(2)}</td>
+                    <td style="text-align: right;">Rs. ${r.sold_price.toFixed(2)}</td>
+                    <td style="text-align: right; font-weight:600;">${r.quantity}</td>
+                    <td style="text-align: right; font-weight:700; color:var(--text-primary);">Rs. ${r.revenue.toFixed(2)}</td>
+                    <td style="text-align: right; font-weight:700; color:#10b981;">Rs. ${r.profit.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        function filterSalesTable() {
+            const q = document.getElementById('salesSearchInput').value.toLowerCase().trim();
+            const filtered = salesTableRowsData.filter(r => 
+                r.name.toLowerCase().includes(q) || 
+                r.sku.toLowerCase().includes(q)
+            );
+            populateTable(filtered);
+        }
+        
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.style.background = type === 'error' ? '#dc2626' : '#4f46e5';
+            toast.classList.add('active');
+            setTimeout(() => toast.classList.remove('active'), 3000);
+        }
+    </script>
+</body>
+</html>

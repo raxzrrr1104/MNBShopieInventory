@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MNB Shopie — Enterprise Inventory</title>
+    <meta name="description" content="Enterprise-grade inventory and billing management system.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="topbar">
+        <div class="topbar-inner">
+            <div class="brand">
+                <img src="image.png" alt="Logo" class="brand-logo">
+                <div class="brand-text">
+                    <h1>MNB Shopie</h1>
+                    <span class="version-badge">ENTERPRISE</span>
+                </div>
+            </div>
+            
+            <div class="nav-links">
+                <a href="/" class="nav-link active">Stock Dashboard</a>
+                <a href="/analytics.html" class="nav-link">Business Analytics</a>
+                <a href="/logout" class="nav-link text-red">Logout</a>
+            </div>
+
+            <div class="topbar-right">
+                <div class="network-badge" id="networkBadge">
+                    <span class="net-dot"></span>
+                    <span class="net-label" id="networkLabel">Online</span>
+                </div>
+                <div class="ip-display" id="ipDisplay">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                    <span id="ipText">—</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="app-container">
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header Section -->
+            <header class="page-header" style="align-items: flex-start;">
+                <div class="header-titles">
+                    <div class="welcome-banner" style="display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <img src="image.png" alt="MNB Shopie Logo" style="height: 72px; width: auto; border-radius: var(--radius-md); box-shadow: var(--shadow-card); border: 2px solid var(--border-light);">
+                        <div>
+                            <h2 style="font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); margin: 0;">MNB Shopie</h2>
+                            <p style="font-size: 0.95rem; color: var(--primary); font-weight: 600; margin: 0.2rem 0 0;">A one stop shop, for all your needs!</p>
+                        </div>
+                    </div>
+                    <p class="header-subtitle" style="margin-left: 0.25rem; font-size: 0.9rem; color: var(--text-secondary);">Manage your inventory, scan new items, and process billing.</p>
+                </div>
+                <div class="header-controls">
+                    <div class="mode-toggle-group glass-panel">
+                        <button class="btn-mode active" id="modeIntakeBtn" data-mode="intake">
+                            <span class="mode-dot dot-intake"></span> Intake Mode
+                        </button>
+                        <button class="btn-mode" id="modeBillBtn" data-mode="bill">
+                            <span class="mode-dot dot-bill"></span> Bill Mode
+                        </button>
+                    </div>
+                    <button class="btn btn-primary" id="kpiScanBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        Scan Product
+                    </button>
+                </div>
+            </header>
+
+            <!-- KPI Row -->
+            <div class="kpi-grid">
+                <div class="kpi-card glass-panel">
+                    <div class="kpi-icon bg-indigo">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-value" id="totalSKUs">0</span>
+                        <span class="kpi-label">Unique SKUs</span>
+                    </div>
+                </div>
+                <div class="kpi-card glass-panel">
+                    <div class="kpi-icon bg-emerald">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-value" id="totalQty">0</span>
+                        <span class="kpi-label">Total Units</span>
+                    </div>
+                </div>
+                <div class="kpi-card glass-panel">
+                    <div class="kpi-icon bg-blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-value" id="salesSoldQty">0</span>
+                        <span class="kpi-label">Items Sold Today</span>
+                    </div>
+                </div>
+                <div class="kpi-card glass-panel">
+                    <div class="kpi-icon bg-amber">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-value text-green" id="salesRevenue">Rs. 0.00</span>
+                        <span class="kpi-label">Today's Revenue</span>
+                        <span class="hidden" id="salesProfit">0</span> <!-- Kept for JS compatibility -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category Selection Bar -->
+            <div class="glass-panel" style="margin-top: 1.25rem; padding: 1rem 1.25rem; animation: fadeInUp 0.4s ease 0.1s both;">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Active Scan Category:</span>
+                        <span id="activeScanCategoryLabel" style="font-size: 0.85rem; font-weight: 800; color: var(--primary); background: var(--primary-light); padding: 0.2rem 0.6rem; border-radius: 4px;">General</span>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" id="categorySelectionChips">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Layout Grid -->
+            <div class="dashboard-grid">
+                <!-- Left Column: Table -->
+                <div class="table-container glass-panel">
+                    <div class="table-header-controls">
+                        <div class="search-wrap">
+                            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                            <input type="text" id="searchInput" placeholder="Search inventory...">
+                        </div>
+                        <div class="filter-bar">
+                            <button class="filter-chip active" data-filter="all">All <span class="chip-count" id="badgeAll">0</span></button>
+                            <button class="filter-chip" data-filter="instock">In Stock <span class="chip-count chip-green" id="badgeInStock">0</span></button>
+                            <button class="filter-chip" data-filter="lowstock">Low Stock <span class="chip-count chip-amber" id="badgeLowStock">0</span></button>
+                            <button class="filter-chip" data-filter="outofstock">Out of Stock <span class="chip-count chip-red" id="badgeOutOfStock">0</span></button>
+                        </div>
+                        <button class="btn btn-outline btn-icon" id="exportBtn" title="Export CSV">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        </button>
+                    </div>
+                    
+                    <div class="table-scroll">
+                        <table id="inventoryTable">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>SKU / Barcode</th>
+                                    <th>Pricing</th>
+                                    <th>Stock</th>
+                                    <th class="text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventoryBody"></tbody>
+                        </table>
+                        <div id="emptyState" class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>
+                            <h3>No items found</h3>
+                            <p>Try adjusting your search or start scanning new items.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Action Panels -->
+                <div class="action-sidebar">
+                    
+                    <!-- Scanner Panel -->
+                    <div class="action-panel glass-panel">
+                        <div class="panel-header">
+                            <h3>Scanner Hub</h3>
+                        </div>
+                        <div class="panel-body">
+                            <button class="btn btn-primary btn-block" id="startScannerBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                Launch Camera
+                            </button>
+                            <div class="divider"><span>OR MANUAL ENTRY</span></div>
+                            <div class="input-group">
+                                <input type="text" id="manualBarcode" placeholder="Enter Barcode / SKU">
+                                <button class="btn btn-outline" id="manualSubmitBtn">Go</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cart Panel -->
+                    <div class="action-panel glass-panel" id="cartPanel">
+                        <div class="panel-header">
+                            <h3>Billing Cart</h3>
+                            <button class="btn-text text-red" id="clearCartBtn" style="display:none;">Clear</button>
+                        </div>
+                        <div class="cart-items" id="cartItemsContainer">
+                            <div class="empty-cart-msg">Cart is empty.<br><small>Click "Bill" on an item to add it.</small></div>
+                        </div>
+                        <div class="cart-summary" id="cartSummary" style="display:none;">
+                            <div class="summary-row">
+                                <span>Items:</span>
+                                <span id="cartTotalQty">0</span>
+                            </div>
+                            <div class="summary-row">
+                                <span>Subtotal:</span>
+                                <span id="cartSubtotalAmount">Rs. 0.00</span>
+                            </div>
+                            <div class="summary-row" id="cartDiscountRow" style="display: none; color: var(--green);">
+                                <span>Discount:</span>
+                                <span id="cartDiscountAmount">-Rs. 0.00</span>
+                            </div>
+                            <div class="summary-row total">
+                                <span>Total:</span>
+                                <span id="cartTotalAmount">Rs. 0.00</span>
+                            </div>
+                            <div class="discount-container" style="margin-top: 0.5rem; margin-bottom: 0.75rem; border-top: 1px dashed var(--border-light); padding-top: 0.75rem;">
+                                <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Discount</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="number" class="input-field" id="cartDiscountValue" placeholder="0" min="0" style="flex: 1; height: 34px; padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+                                    <div class="stepper-btn-group" style="display: flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; background: var(--bg-card); height: 34px;">
+                                        <button type="button" class="discount-type-btn active" id="discountTypePercent" style="padding: 0 0.5rem; border: none; background: var(--primary); color: #fff; cursor: pointer; font-size: 0.8rem; font-weight: 600;">%</button>
+                                        <button type="button" class="discount-type-btn" id="discountTypeAmount" style="padding: 0 0.5rem; border: none; background: transparent; color: var(--text-primary); cursor: pointer; font-size: 0.8rem; font-weight: 600;">Rs.</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-top: 0.75rem; margin-bottom: 0.75rem;">
+                                <label for="checkoutCustomerEmail" style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Customer Email (for receipt PDF)</label>
+                                <input type="email" class="input-field" id="checkoutCustomerEmail" placeholder="e.g. customer@gmail.com" style="height: 34px; padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+                            </div>
+                            <button class="btn btn-success btn-block" id="checkoutBtn">
+                                Complete Bill
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Connect Panel -->
+                    <div class="action-panel glass-panel" id="connectCard">
+                        <div class="panel-header">
+                            <h3>Mobile Access</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="connect-box" id="mobileUrlBox">
+                                <code id="mobileUrlText">Detecting...</code>
+                                <button class="btn-icon-small" id="copyUrlBtn" title="Copy URL">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                </button>
+                            </div>
+                            <button class="btn btn-outline btn-block" id="emailSummaryBtn" style="margin-top:0.75rem;">
+                                Email Daily Report
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Chart Panel (Moved from separate card) -->
+                    <div class="action-panel glass-panel">
+                        <div class="panel-header">
+                            <h3>Stock Distribution</h3>
+                        </div>
+                        <div class="panel-body">
+                            <canvas id="stockChart" height="150"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Logs Panel -->
+                    <div class="action-panel glass-panel logs-panel">
+                        <div class="panel-header">
+                            <h3>System Logs</h3>
+                        </div>
+                        <div class="logs-scroll" id="logsContainer">
+                            <div class="log-entry log-system">System initialized.</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Categories Management Panel -->
+            <section class="glass-panel" style="margin-top: 1.5rem; padding: 1.5rem; animation: fadeInUp 0.4s ease 0.3s both;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                    <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                        Manage Categories
+                    </h3>
+                </div>
+                <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="newCategoryName">New Category Name</label>
+                        <input type="text" class="input-field" id="newCategoryName" placeholder="e.g. Beverages" style="height: 38px;">
+                    </div>
+                    <button class="btn btn-primary" id="addCategoryBtn" style="height: 38px; margin-top: 1.25rem;">
+                        Add Category
+                    </button>
+                </div>
+            </section>
+
+            <!-- Add Manual Product Panel -->
+            <section class="glass-panel" style="margin-top: 1.5rem; padding: 1.5rem; animation: fadeInUp 0.4s ease 0.3s both;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                    <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        Add Manual Product
+                    </h3>
+                    <button class="btn btn-outline btn-sm" id="btnShowManualBarcodes">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right: 4px; vertical-align: middle;"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M6 18H4.5a2.5 2.5 0 0 0 0 5H6M18 18h1.5a2.5 2.5 0 0 1 0 5H18M21 9v6M3 9v6"/><line x1="12" y1="5" x2="12" y2="19"/></svg>
+                        Barcodes Sheet
+                    </button>
+                </div>
+                <form id="manualProductForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items: end;">
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label for="manualProdName">Product Name</label>
+                        <input type="text" class="input-field" id="manualProdName" placeholder="e.g. Home Made Cookies" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="manualProdSKU">SKU (Auto-Generated)</label>
+                        <input type="text" class="input-field readonly" id="manualProdSKU" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="manualProdBarcode">Barcode (Auto-Generated)</label>
+                        <input type="text" class="input-field readonly" id="manualProdBarcode" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="manualProdQty">Quantity</label>
+                        <input type="number" class="input-field" id="manualProdQty" value="1" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="manualProdIntake">Intake Price (Optional)</label>
+                        <input type="number" class="input-field" id="manualProdIntake" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="manualProdSelling">Selling Price</label>
+                        <input type="number" class="input-field" id="manualProdSelling" placeholder="0.00" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="manualProdCategory">Category</label>
+                        <select class="input-field" id="manualProdCategory"></select>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label for="manualProdImage">Image URL (Optional)</label>
+                        <input type="text" class="input-field" id="manualProdImage" placeholder="https://example.com/image.jpg">
+                    </div>
+                    <div style="grid-column: span 2; display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
+                        <button type="button" class="btn btn-outline" id="btnRegenManualCodes">Regenerate Codes</button>
+                        <button type="submit" class="btn btn-primary">Add Manual Product</button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- System Settings Panel -->
+            <section class="glass-panel" style="margin-top: 1.5rem; padding: 1.5rem; animation: fadeInUp 0.4s ease 0.3s both;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                    <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        System & Email Configuration
+                    </h3>
+                    <span style="font-size: 0.72rem; color: var(--text-tertiary); font-weight: 700; text-transform: uppercase; background: var(--primary-light); color: var(--primary); padding: 0.15rem 0.5rem; border-radius: var(--radius-sm);">Supabase DB Persisted</span>
+                </div>
+                <form id="settingsForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items: end;">
+                    <div class="form-group">
+                        <label for="settingsRecipient">Report Recipient Email</label>
+                        <input type="email" class="input-field" id="settingsRecipient" placeholder="e.g. mohitshers@gmail.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="settingsSmtpServer">SMTP Server</label>
+                        <input type="text" class="input-field" id="settingsSmtpServer" placeholder="smtp.gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="settingsSmtpPort">SMTP Port</label>
+                        <input type="text" class="input-field" id="settingsSmtpPort" placeholder="587">
+                    </div>
+                    <div class="form-group">
+                        <label for="settingsSmtpUser">SMTP Username (Sender)</label>
+                        <input type="text" class="input-field" id="settingsSmtpUser" placeholder="your_email@gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="settingsSmtpPassword">SMTP App Password</label>
+                        <input type="password" class="input-field" id="settingsSmtpPassword" placeholder="Enter password to change">
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem; height: 38px;">
+                        <button type="submit" class="btn btn-primary" id="saveSettingsBtn" style="height: 100%; width: 100%;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            Save Settings
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Scanner Camera Modal -->
+    <div class="modal-backdrop" id="scannerModal">
+        <div class="modal-box modal-scanner glass-panel">
+            <div class="modal-header">
+                <h3>Camera Scanner</h3>
+                <button class="btn-icon-small" id="closeScannerModal">&times;</button>
+            </div>
+            <div class="scanner-viewport">
+                <div id="reader"></div>
+            </div>
+            <p class="modal-hint">Align barcode within the frame</p>
+        </div>
+    </div>
+
+    <!-- Quantity Modal -->
+    <div class="modal-backdrop" id="qtyModal">
+        <div class="modal-box glass-panel">
+            <div class="modal-header">
+                <h3>Add Product Quantity</h3>
+            </div>
+            <div class="qty-preview">
+                <div class="img-frame">
+                    <img id="qtyPreviewImg" src="" alt="Product" style="display:none;">
+                    <div class="img-placeholder" id="qtyPreviewPlaceholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                    </div>
+                </div>
+                <div class="info">
+                    <div class="name" id="qtyModalProdName">—</div>
+                    <div class="mono-text" id="qtyModalBarcode">—</div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Image URL <span class="hint">(Editable)</span></label>
+                <input type="text" class="input-field" id="qtyImageUrl">
+            </div>
+            <div class="form-group">
+                <label>Intake Price <span class="hint">(Optional)</span></label>
+                <input type="number" class="input-field" id="qtyIntakePrice" step="0.01">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Selling Price</label>
+                    <input type="number" class="input-field" id="qtySellingPrice" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select class="input-field" id="qtyCategory"></select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Quantity to Add</label>
+                <div class="number-stepper">
+                    <button class="stepper-btn" id="qtyMinus">−</button>
+                    <input type="number" id="qtyInput" value="1" min="1">
+                    <button class="stepper-btn" id="qtyPlus">+</button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" id="cancelQtyBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmQtyBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fuzzy Match Modal -->
+    <div class="modal-backdrop" id="fuzzyModal">
+        <div class="modal-box glass-panel">
+            <div class="modal-header">
+                <h3>Similar Product Found</h3>
+            </div>
+            <p class="modal-text">Resolved barcode to: <strong class="text-highlight" id="fuzzyWebName">—</strong></p>
+            <p class="modal-text">A similar product exists in inventory. Merge or create new?</p>
+            <div class="fuzzy-list" id="fuzzyOptionsList"></div>
+            <div class="divider"><span>OR</span></div>
+            <div class="modal-actions stacked">
+                <button class="btn btn-outline" id="createAsNewBtn">Create New SKU</button>
+                <button class="btn btn-text" id="cancelFuzzyBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div class="modal-backdrop" id="registerModal">
+        <div class="modal-box glass-panel">
+            <div class="modal-header">
+                <h3>Register New Product</h3>
+            </div>
+            <p class="modal-text">Barcode <code class="mono-text" id="registerBarcode">—</code> not recognized.</p>
+            <div class="form-group">
+                <label>Product Name</label>
+                <input type="text" class="input-field" id="registerName" placeholder="e.g. Dove Shampoo">
+                <span id="nameSearchStatus" class="field-status"></span>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>SKU <span class="hint">(Auto if blank)</span></label>
+                    <input type="text" class="input-field" id="registerSKU">
+                </div>
+                <div class="form-group">
+                    <label>Initial Qty</label>
+                    <input type="number" class="input-field" id="registerQty" value="1" min="1">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Image URL</label>
+                <input type="text" class="input-field" id="registerImage">
+            </div>
+            <div class="form-group">
+                <label>Intake Price <span class="hint">(Optional)</span></label>
+                <input type="number" class="input-field" id="registerIntakePrice" step="0.01">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Selling Price</label>
+                    <input type="number" class="input-field" id="registerSellingPrice" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select class="input-field" id="registerCategory"></select>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" id="cancelRegisterBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmRegisterBtn">Add Product</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal-backdrop" id="editModal">
+        <div class="modal-box glass-panel">
+            <div class="modal-header">
+                <h3>Edit Product</h3>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>SKU</label>
+                    <input type="text" class="input-field readonly" id="editSKU" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Barcode</label>
+                    <input type="text" class="input-field" id="editBarcode">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Product Name</label>
+                <input type="text" class="input-field" id="editName">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Quantity</label>
+                    <input type="number" class="input-field" id="editQty" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Intake Price</label>
+                    <input type="number" class="input-field" id="editIntakePrice" step="0.01">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Image URL</label>
+                <input type="text" class="input-field" id="editImage">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Selling Price</label>
+                    <input type="number" class="input-field" id="editSellingPrice" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select class="input-field" id="editCategory"></select>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" id="cancelEditBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmEditBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Prompt -->
+    <div class="modal-backdrop" id="deletePromptModal">
+        <div class="modal-box glass-panel modal-sm">
+            <div class="modal-header">
+                <h3 class="text-red">Delete Product</h3>
+            </div>
+            <p class="modal-text">Permanently remove <strong id="deleteModalName" class="text-highlight">—</strong> (<code id="deleteModalSku"></code>)?</p>
+            <div class="modal-actions">
+                <button class="btn btn-outline" id="cancelDeleteBtn">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bill Warning -->
+    <div class="modal-backdrop" id="billWarningModal">
+        <div class="modal-box glass-panel modal-sm">
+            <div class="modal-header">
+                <h3 class="text-amber">Product Not Found</h3>
+            </div>
+            <p class="modal-text">Barcode <strong id="billWarningBarcode" class="text-highlight">—</strong> must be registered before billing.</p>
+            <div class="modal-actions stacked">
+                <button class="btn btn-primary" id="btnRegisterFromBill">Register to Inventory</button>
+                <button class="btn btn-text" id="btnCancelBillWarning">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barcodes Sheet Modal -->
+    <div class="modal-backdrop" id="barcodesSheetModal">
+        <div class="modal-box glass-panel" style="max-width: 800px; width: 90%;">
+            <div class="modal-header">
+                <h3>Counter Barcodes Sheet</h3>
+                <button class="close-btn" id="closeBarcodesSheetModal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">×</button>
+            </div>
+            <p class="modal-text" style="margin-bottom: 1rem;">
+                Here are your manually added products. Print this sheet to stick on your counter for quick scanning.
+            </p>
+            <div id="barcodesSheetContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; max-height: 50vh; overflow-y: auto; padding: 1rem; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: #fff; color: #000;">
+                <!-- Dynamically populated -->
+            </div>
+            <div class="modal-actions" style="margin-top: 1rem;">
+                <button class="btn btn-outline" id="btnPrintBarcodesSheet">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right:4px; vertical-align:middle;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    Print / Save PDF
+                </button>
+                <button class="btn btn-primary" id="btnDismissBarcodesSheet">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">Updated</div>
+
+    <footer style="text-align: center; padding: 2rem 1rem 1rem; font-size: 0.65rem; color: var(--text-tertiary); opacity: 0.25; font-weight: 500; text-transform: lowercase; clear: both;">
+        made with &lt;3 by mohit sherkhane
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

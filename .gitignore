@@ -1,0 +1,23 @@
+# Environments
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# SSL Certificates
+*.pem
+*.key
+
+# Local Data/CSVs
+sales.csv
+inventory.csv
+
+# OS metadata
+.DS_Store
