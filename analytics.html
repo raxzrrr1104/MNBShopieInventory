@@ -176,23 +176,23 @@
                 
                 <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
                     <!-- Add Expense Form -->
-                    <div style="background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: var(--radius-md); border: 1px dashed rgba(255,255,255,0.12);">
+                    <div style="background: var(--bg-muted); padding: 1.5rem; border-radius: var(--radius-md); border: 1px dashed var(--border-strong);">
                         <h3 style="margin-top: 0; margin-bottom: 1.25rem; font-size: 1rem; color: var(--text-primary);">Log New Expense</h3>
                         <form id="addExpenseForm" onsubmit="submitExpense(event)">
                             <div style="margin-bottom: 1rem;">
                                 <label style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Expense Description</label>
-                                <input type="text" id="expenseName" placeholder="e.g. Employee Salaries, Electricity Bill" required style="width: 100%; padding: 0.75rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: var(--radius-sm); color: var(--text-primary); font-family: inherit; font-size: 0.9rem;">
+                                <input type="text" id="expenseName" placeholder="e.g. Employee Salaries, Electricity Bill" required class="input-field" style="width: 100%;">
                             </div>
                             <div style="margin-bottom: 1.5rem;">
                                 <label style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Amount (Rs.)</label>
-                                <input type="number" step="0.01" id="expenseAmount" placeholder="0.00" required style="width: 100%; padding: 0.75rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: var(--radius-sm); color: var(--text-primary); font-family: inherit; font-size: 0.9rem;">
+                                <input type="number" step="0.01" id="expenseAmount" placeholder="0.00" required class="input-field" style="width: 100%;">
                             </div>
                             <button type="submit" class="btn btn-primary" style="width: 100%; font-weight: 600; padding: 0.75rem;">Record Expense</button>
                         </form>
                     </div>
                     
                     <!-- Expense List Table -->
-                    <div class="table-wrap" style="max-height: 350px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-md);">
+                    <div class="table-wrap" style="max-height: 350px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-md);">
                         <table>
                             <thead>
                                 <tr>
@@ -212,7 +212,7 @@
         </main>
     </div>
 
-    <footer style="text-align: center; padding: 2rem 1rem 1rem; font-size: 0.65rem; color: var(--text-tertiary); opacity: 0.25; font-weight: 500; text-transform: lowercase; clear: both;">
+    <footer class="page-footer">
         made with &lt;3 by mohit sherkhane
     </footer>
 

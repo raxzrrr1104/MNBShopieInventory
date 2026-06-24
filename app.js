@@ -777,31 +777,40 @@ function renderInventory() {
             <td>
                 <div class="prod-cell">
                     ${imgHtml}
-                    <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <div style="display:flex; flex-direction:column; gap:0.3rem;">
                         <span class="prod-name">${item.name}</span>
-                        <span class="category-badge" style="font-size: 0.7rem; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 0.15rem 0.4rem; border-radius: 4px; align-self: flex-start; text-transform: uppercase;">${item.category || 'General'}</span>
+                        <span class="category-badge" style="font-size: 0.7rem; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 0.15rem 0.45rem; border-radius: 4px; align-self: flex-start; text-transform: uppercase;">${item.category || 'General'}</span>
                     </div>
                 </div>
             </td>
             <td>
-                <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                <div style="display:flex; flex-direction:column; gap:0.3rem;">
                     <span class="sku-mono">${item.sku}</span>
                     <span class="barcode-mono">${item.barcode}</span>
                 </div>
             </td>
             <td>
-                <div style="display:flex; flex-direction:column; gap:0.15rem; font-size: 0.75rem;">
-                    <span style="color: var(--text-tertiary);">In: ${intakePriceText}</span>
-                    <span style="font-weight: 700; color: var(--text-primary); font-size: 0.8rem;">Selling: ${sellingPriceText}</span>
-                    <span class="text-green" style="font-weight: 500;">Out: ${avgSellingPriceText}</span>
+                <div class="pricing-cell">
+                    <div><span class="pricing-label">In: </span><span class="pricing-value intake">${intakePriceText}</span></div>
+                    <div><span class="pricing-label">Sell: </span><span class="pricing-value selling">${sellingPriceText}</span></div>
+                    <div><span class="pricing-label">Out: </span><span class="pricing-value avg-out">${avgSellingPriceText}</span></div>
                 </div>
             </td>
             <td><span class="stock-badge ${badgeClass}">${badgeText}</span></td>
             <td class="text-right">
                 <div class="action-cell">
-                    <button class="btn btn-sm btn-outline text-green" style="border-color: var(--success);" onclick="addToCart('${item.sku}')">Bill</button>
-                    <button class="btn btn-sm btn-ghost" onclick="openEditModal('${item.sku}')">Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="confirmDelete('${item.sku}', '${escapedName}')">Delete</button>
+                    <button class="btn-action bill" onclick="addToCart('${item.sku}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                        Bill
+                    </button>
+                    <button class="btn-action edit" onclick="openEditModal('${item.sku}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Edit
+                    </button>
+                    <button class="btn-action delete" onclick="confirmDelete('${item.sku}', '${escapedName}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        Del
+                    </button>
                 </div>
             </td>
         `;
