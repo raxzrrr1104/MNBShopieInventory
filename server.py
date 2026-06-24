@@ -1,9 +1,11 @@
 import os
 import csv
+import io
 import socket
 import logging
 import difflib
 import requests
+import datetime
 import urllib.parse
 from flask import Flask, request, jsonify, send_file, session, redirect, url_for
 from flask_cors import CORS
@@ -84,7 +86,7 @@ def read_inventory():
                     'barcode': p.get('barcode', '').strip(),
                     'name': p.get('name', '').strip(),
                     'quantity': int(p.get('quantity', 0) or 0),
-                    'image_url': p.get('image_url', '') or '',
+                    'image_url': (p.get('image_url', '') or '').replace('http://', 'https://'),
                     'intake_price': intake,
                     'selling_price': selling,
                     'category': p.get('category', 'General') or 'General'
@@ -895,170 +897,243 @@ import io
 from email.mime.base import MIMEBase
 from email import encoders
 
-def generate_receipt_pdf(customer_email, cart, total_amount):
-    from reportlab.lib.pagesizes import letter
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib import colors
-    
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=54, leftMargin=54, topMargin=54, bottomMargin=54)
-    story = []
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle(
-        'DocTitle',
-        fontName='Helvetica-Bold',
-        fontSize=26,
-        leading=30,
-        textColor=colors.HexColor('#1e293b'),
-    )
-    
-    subtitle_style = ParagraphStyle(
-        'DocSubTitle',
-        fontName='Helvetica',
-        fontSize=10,
-        leading=14,
-        textColor=colors.HexColor('#64748b'),
-        spaceAfter=15
-    )
-    
-    body_style = ParagraphStyle(
-        'DocBody',
-        fontName='Helvetica',
-        fontSize=9.5,
-        leading=14,
-        textColor=colors.HexColor('#334155')
-    )
-    
-    body_bold = ParagraphStyle(
-        'DocBodyBold',
-        parent=body_style,
-        fontName='Helvetica-Bold'
-    )
-    
-    # Header Section
-    header_data = [
-        [
-            Paragraph("<b>MNB SHOPIE</b>", title_style),
-            Paragraph("<b>INVOICE RECEIPT</b>", ParagraphStyle('InvoiceTitle', fontName='Helvetica-Bold', fontSize=14, leading=18, textColor=colors.HexColor('#4f46e5'), alignment=2))
-        ],
-        [
-            Paragraph("A one stop shop, for all your needs!", subtitle_style),
-            Paragraph(f"Date: {datetime.datetime.now().strftime('%B %d, %Y %I:%M %p')}", ParagraphStyle('InvoiceDate', fontName='Helvetica', fontSize=9, leading=13, textColor=colors.HexColor('#64748b'), alignment=2))
+def generate_bill_pdf(bill_no):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return None
+        
+    try:
+        encoded_bill = urllib.parse.quote(bill_no)
+        # Fetch parent bill
+        res_bill = requests.get(f"{SUPABASE_URL}/rest/v1/bills?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
+        if res_bill.status_code != 200 or not res_bill.json():
+            return None
+        bill = res_bill.json()[0]
+        
+        # Fetch items
+        res_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
+        items = res_items.json() if res_items.status_code == 200 else []
+        
+        # Fetch logs
+        res_logs = requests.get(f"{SUPABASE_URL}/rest/v1/transaction_logs?parent_bill_no=eq.{encoded_bill}&order=date.desc", headers=supabase_headers(), timeout=10)
+        logs = res_logs.json() if res_logs.status_code == 200 else []
+        
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=54, leftMargin=54, topMargin=54, bottomMargin=54)
+        story = []
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle(
+            'DocTitle',
+            fontName='Helvetica-Bold',
+            fontSize=22,
+            leading=26,
+            textColor=colors.HexColor('#1e293b'),
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'DocSubTitle',
+            fontName='Helvetica',
+            fontSize=9.5,
+            leading=13,
+            textColor=colors.HexColor('#64748b'),
+            spaceAfter=15
+        )
+        
+        body_style = ParagraphStyle(
+            'DocBody',
+            fontName='Helvetica',
+            fontSize=9,
+            leading=13,
+            textColor=colors.HexColor('#334155')
+        )
+        
+        body_bold = ParagraphStyle(
+            'DocBodyBold',
+            parent=body_style,
+            fontName='Helvetica-Bold'
+        )
+        
+        # Try to load brand logo Image
+        brand_logo = None
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'image.png')
+        if os.path.exists(logo_path):
+            try:
+                from reportlab.platypus import Image as RLImage
+                # 120 width, 38 height keeps aspect ratio perfect
+                brand_logo = RLImage(logo_path, width=120, height=38)
+            except Exception as logo_err:
+                logging.error(f"Error loading brand logo for PDF: {logo_err}")
+
+        # Header Section
+        header_left_flow = []
+        if brand_logo:
+            header_left_flow.append(brand_logo)
+            header_left_flow.append(Spacer(1, 4))
+        header_left_flow.append(Paragraph("<b>MNB Shopie — Curated Imported Luxury</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=10, leading=14, textColor=colors.HexColor('#1e293b'))))
+        header_left_flow.append(Paragraph("A one stop shop, for all your needs!", subtitle_style))
+
+        header_data = [
+            [
+                header_left_flow,
+                [
+                    Paragraph(f"<b>INVOICE {bill_no}</b>", ParagraphStyle('InvoiceTitle', fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor('#4f46e5'), alignment=2)),
+                    Spacer(1, 4),
+                    Paragraph(f"Date: {bill['date']}", ParagraphStyle('InvoiceDate', fontName='Helvetica', fontSize=9, leading=13, textColor=colors.HexColor('#64748b'), alignment=2))
+                ]
+            ]
         ]
-    ]
-    
-    header_table = Table(header_data, colWidths=[252, 252])
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('PADDING', (0,0), (-1,-1), 0),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-    ]))
-    story.append(header_table)
-    story.append(Spacer(1, 10))
-    
-    # Decorative colored line
-    line_table = Table([[""]], colWidths=[504])
-    line_table.setStyle(TableStyle([
-        ('LINEBELOW', (0,0), (-1,-1), 2, colors.HexColor('#4f46e5')),
-        ('PADDING', (0,0), (-1,-1), 0),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
-        ('TOPPADDING', (0,0), (-1,-1), 0),
-    ]))
-    story.append(line_table)
-    story.append(Spacer(1, 15))
-    
-    # Billing Metadata Table
-    billing_data = [
-        [Paragraph("<b>Billed To:</b>", body_bold), Paragraph(customer_email if customer_email else "Walk-in Customer", body_style)],
-        [Paragraph("<b>Payment Status:</b>", body_bold), Paragraph("PAID", ParagraphStyle('PaidBadge', parent=body_style, textColor=colors.HexColor('#059669'), fontName='Helvetica-Bold'))]
-    ]
-    billing_table = Table(billing_data, colWidths=[100, 404])
-    billing_table.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('PADDING', (0,0), (-1,-1), 2),
-        ('LEFTPADDING', (0,0), (-1,-1), 0),
-    ]))
-    story.append(billing_table)
-    story.append(Spacer(1, 20))
-    
-    # Items Table Headers
-    th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=9, leading=12, textColor=colors.HexColor('#475569'))
-    th_right = ParagraphStyle('THRight', parent=th_style, alignment=2)
-    th_center = ParagraphStyle('THCenter', parent=th_style, alignment=1)
-    
-    items_data = [[
-        Paragraph("Product Description", th_style),
-        Paragraph("Unit Price", th_right),
-        Paragraph("Quantity", th_center),
-        Paragraph("Amount", th_right)
-    ]]
-    
-    # Populate items
-    td_style = ParagraphStyle('TD', fontName='Helvetica', fontSize=9.5, leading=13, textColor=colors.HexColor('#0f172a'))
-    td_right = ParagraphStyle('TDRight', parent=td_style, alignment=2)
-    td_center = ParagraphStyle('TDCenter', parent=td_style, alignment=1)
-    
-    for item in cart:
-        name = item.get('name', 'Product')
-        qty = int(item.get('quantity', 0))
-        price = float(item.get('sold_price', 0.0))
-        subtotal = price * qty
+        
+        header_table = Table(header_data, colWidths=[252, 252])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('PADDING', (0,0), (-1,-1), 0),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ]))
+        story.append(header_table)
+        story.append(Spacer(1, 10))
+        
+        # Decorative colored line
+        line_table = Table([[""]], colWidths=[504])
+        line_table.setStyle(TableStyle([
+            ('LINEBELOW', (0,0), (-1,-1), 2, colors.HexColor('#4f46e5')),
+            ('PADDING', (0,0), (-1,-1), 0),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+            ('TOPPADDING', (0,0), (-1,-1), 0),
+        ]))
+        story.append(line_table)
+        story.append(Spacer(1, 15))
+        
+        # Billing Metadata Table
+        status_colors = {
+            'completed': '#059669',
+            'partially_refunded': '#d97706',
+            'exchanged': '#4f46e5',
+            'refunded': '#dc2626'
+        }
+        status_labels = {
+            'completed': 'PAID / COMPLETED',
+            'partially_refunded': 'PARTIALLY RETURNED',
+            'exchanged': 'EXCHANGED',
+            'refunded': 'FULLY REFUNDED'
+        }
+        bill_status = bill.get('status', 'completed')
+        status_color = status_colors.get(bill_status, '#059669')
+        status_label = status_labels.get(bill_status, bill_status.upper())
+        
+        billing_data = [
+            [Paragraph("<b>Billed To:</b>", body_bold), Paragraph(bill['customer_email'] if bill['customer_email'] else "Walk-in Customer", body_style)],
+            [Paragraph("<b>Invoice Status:</b>", body_bold), Paragraph(status_label, ParagraphStyle('InvoiceStatus', parent=body_style, textColor=colors.HexColor(status_color), fontName='Helvetica-Bold'))]
+        ]
+        billing_table = Table(billing_data, colWidths=[100, 404])
+        billing_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('PADDING', (0,0), (-1,-1), 2),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ]))
+        story.append(billing_table)
+        story.append(Spacer(1, 20))
+        
+        # Items Table Headers
+        th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=8.5, leading=11, textColor=colors.HexColor('#475569'))
+        th_right = ParagraphStyle('THRight', parent=th_style, alignment=2)
+        th_center = ParagraphStyle('THCenter', parent=th_style, alignment=1)
+        
+        items_data = [[
+            Paragraph("Product Description", th_style),
+            Paragraph("Unit Price", th_right),
+            Paragraph("Qty", th_center),
+            Paragraph("Ret", th_center),
+            Paragraph("Net Amount", th_right)
+        ]]
+        
+        # Populate items
+        td_style = ParagraphStyle('TD', fontName='Helvetica', fontSize=9, leading=12, textColor=colors.HexColor('#0f172a'))
+        td_right = ParagraphStyle('TDRight', parent=td_style, alignment=2)
+        td_center = ParagraphStyle('TDCenter', parent=td_style, alignment=1)
+        
+        for item in items:
+            name = item.get('product_name', 'Product')
+            qty = int(item.get('quantity', 0))
+            returned = int(item.get('returned_quantity', 0) or 0)
+            price = float(item.get('final_sold_price', 0.0))
+            net_qty = max(0, qty - returned)
+            subtotal = price * net_qty
+            
+            items_data.append([
+                Paragraph(name, td_style),
+                Paragraph(f"Rs. {price:.2f}", td_right),
+                Paragraph(str(qty), td_center),
+                Paragraph(str(returned) if returned > 0 else "0", td_center),
+                Paragraph(f"Rs. {subtotal:.2f}", td_right)
+            ])
+            
+        # spacing row
+        items_data.append(["", "", "", "", ""])
+        
+        # Grand Total row
         items_data.append([
-            Paragraph(name, td_style),
-            Paragraph(f"Rs. {price:.2f}", td_right),
-            Paragraph(str(qty), td_center),
-            Paragraph(f"Rs. {subtotal:.2f}", td_right)
+            "", "", "",
+            Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=10, leading=13, alignment=2, textColor=colors.HexColor('#0f172a'))),
+            Paragraph(f"<b>Rs. {float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=11, leading=13, alignment=2, textColor=colors.HexColor('#4f46e5')))
         ])
         
-    # spacing row
-    items_data.append(["", "", "", ""])
-    
-    # Grand Total row
-    items_data.append([
-        "", "",
-        Paragraph("<b>Grand Total</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=11, leading=14, alignment=2, textColor=colors.HexColor('#0f172a'))),
-        Paragraph(f"<b>Rs. {total_amount:.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=12, leading=14, alignment=2, textColor=colors.HexColor('#4f46e5')))
-    ])
-    
-    items_table = Table(items_data, colWidths=[244, 100, 60, 100])
-    items_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f8fafc')),
-        ('TOPPADDING', (0,0), (-1,0), 8),
-        ('BOTTOMPADDING', (0,0), (-1,0), 8),
-        ('LINEBELOW', (0,0), (-1,0), 1, colors.HexColor('#e2e8f0')),
+        items_table = Table(items_data, colWidths=[204, 80, 50, 50, 120])
+        items_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f8fafc')),
+            ('TOPPADDING', (0,0), (-1,0), 6),
+            ('BOTTOMPADDING', (0,0), (-1,0), 6),
+            ('LINEBELOW', (0,0), (-1,0), 1, colors.HexColor('#e2e8f0')),
+            
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING', (0,1), (-1,-3), 6),
+            ('BOTTOMPADDING', (0,1), (-1,-3), 6),
+            ('LINEBELOW', (0,1), (-1,-3), 0.5, colors.HexColor('#f1f5f9')),
+            
+            ('LINEABOVE', (3,-1), (4,-1), 1.5, colors.HexColor('#cbd5e1')),
+            ('TOPPADDING', (3,-1), (4,-1), 10),
+            ('BOTTOMPADDING', (3,-1), (4,-1), 10),
+        ]))
+        story.append(items_table)
+        story.append(Spacer(1, 15))
         
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING', (0,1), (-1,-3), 8),
-        ('BOTTOMPADDING', (0,1), (-1,-3), 8),
-        ('LINEBELOW', (0,1), (-1,-3), 0.5, colors.HexColor('#f1f5f9')),
+        # Activity Logs Section in PDF
+        if logs:
+            story.append(Paragraph("<b>Transaction Return & Exchange Logs</b>", ParagraphStyle('LogTitle', fontName='Helvetica-Bold', fontSize=10, leading=14, textColor=colors.HexColor('#1e293b'))))
+            story.append(Spacer(1, 5))
+            for log in logs:
+                log_items_str = ", ".join([f"{it['action'].upper()}: {it['quantity']}x {it['product_name']}" for it in log.get('items_involved', [])])
+                cash_str = f"Cash Adjustment: Rs. {float(log.get('cash_delta', 0.0)):.2f}"
+                log_p_style = ParagraphStyle('LogP', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#475569'))
+                story.append(Paragraph(f"• <b>[{log['date']}] {log['type'].upper()}:</b> {log_items_str} ({cash_str})", log_p_style))
+                story.append(Spacer(1, 3))
+            story.append(Spacer(1, 15))
+            
+        # Greeting
+        footer_style = ParagraphStyle(
+            'DocFooter',
+            fontName='Helvetica-Oblique',
+            fontSize=8.5,
+            leading=12,
+            textColor=colors.HexColor('#94a3b8'),
+            alignment=1
+        )
+        story.append(Paragraph("Thank you for choosing MNB Shopie. We appreciate your business!", footer_style))
         
-        ('LINEABOVE', (2,-1), (3,-1), 1.5, colors.HexColor('#cbd5e1')),
-        ('TOPPADDING', (2,-1), (3,-1), 12),
-        ('BOTTOMPADDING', (2,-1), (3,-1), 12),
-    ]))
-    story.append(items_table)
-    story.append(Spacer(1, 40))
-    
-    # Note / Greeting
-    footer_style = ParagraphStyle(
-        'DocFooter',
-        fontName='Helvetica-Oblique',
-        fontSize=9,
-        leading=13,
-        textColor=colors.HexColor('#94a3b8'),
-        alignment=1
-    )
-    story.append(Paragraph("Thank you for choosing MNB Shopie. We appreciate your business!", footer_style))
-    
-    doc.build(story)
-    pdf_bytes = buffer.getvalue()
-    buffer.close()
-    return pdf_bytes
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        return pdf_bytes
+    except Exception as e:
+        logging.error(f"Error generating bill PDF: {e}")
+        return None
 
-def send_customer_receipt_email(customer_email, cart, total_amount, smtp_config):
-    subject = "Your Luxurious Receipt from MNB Shopie"
+def send_customer_receipt_email(customer_email, cart, total_amount, smtp_config, bill_no):
+    subject = f"Your Luxurious Receipt from MNB Shopie (Bill: {bill_no})"
     
     msg = MIMEMultipart('mixed')
     msg['Subject'] = subject
@@ -1171,11 +1246,11 @@ def send_customer_receipt_email(customer_email, cart, total_amount, smtp_config)
     body_alternative.attach(MIMEText(html_content, 'html'))
     msg.attach(body_alternative)
     
-    pdf_data = generate_receipt_pdf(customer_email, cart, total_amount)
+    pdf_data = generate_bill_pdf(bill_no)
     attachment = MIMEBase('application', 'pdf')
     attachment.set_payload(pdf_data)
     encoders.encode_base64(attachment)
-    attachment.add_header('Content-Disposition', 'attachment', filename='MNB_Shopie_Invoice.pdf')
+    attachment.add_header('Content-Disposition', 'attachment', filename=f'{bill_no}_Receipt.pdf')
     msg.attach(attachment)
         
     server = smtplib.SMTP(smtp_config['server'], int(smtp_config['port']))
@@ -1183,6 +1258,81 @@ def send_customer_receipt_email(customer_email, cart, total_amount, smtp_config)
     server.login(smtp_config['user'], smtp_config['password'])
     server.sendmail(smtp_config['user'], customer_email, msg.as_string())
     server.quit()
+
+def email_updated_receipt(bill_no, type_of_transaction):
+    """Sends updated receipt/refund/exchange PDF to the customer."""
+    try:
+        encoded_bill = urllib.parse.quote(bill_no)
+        res_bill = requests.get(f"{SUPABASE_URL}/rest/v1/bills?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
+        if res_bill.status_code != 200 or not res_bill.json():
+            return False, "Bill not found"
+        bill = res_bill.json()[0]
+        
+        customer_email = bill.get('customer_email', '').strip()
+        if not customer_email:
+            return False, "No customer email on bill"
+            
+        success_smtp, smtp_config = get_smtp_config()
+        if not success_smtp or not smtp_config or not smtp_config.get('user') or not smtp_config.get('password'):
+            return False, "SMTP not configured"
+            
+        pdf_bytes = generate_bill_pdf(bill_no)
+        if not pdf_bytes:
+            return False, "Failed to generate receipt PDF"
+            
+        subject = f"MNB Shopie — Updated Invoice {bill_no} ({type_of_transaction.upper()})"
+        
+        msg = MIMEMultipart('mixed')
+        msg['Subject'] = subject
+        msg['From'] = f"MNB Shopie <{smtp_config['user']}>"
+        msg['To'] = customer_email
+        
+        html_content = f"""
+        <html>
+        <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; background-color: #f8fafc; color: #334155; padding: 20px; }}
+            .card {{ max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }}
+            h1 {{ color: #1e293b; font-size: 20px; margin-bottom: 20px; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; }}
+            p {{ line-height: 1.5; font-size: 14px; }}
+            .highlight {{ background: #f1f5f9; padding: 10px; border-radius: 4px; font-weight: bold; display: inline-block; margin-top: 5px; }}
+            .footer {{ margin-top: 30px; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; text-align: center; }}
+        </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>MNB Shopie Invoice Update</h1>
+                <p>Hello,</p>
+                <p>An exchange or return transaction has been processed for your bill reference <strong>{bill_no}</strong>.</p>
+                <p>We have attached your <strong>revised invoice receipt</strong> (PDF) to this email showing the updated quantities, transaction return log, and cash adjustments.</p>
+                <p>Transaction Type: <span class="highlight">{type_of_transaction.upper()}</span></p>
+                <p>Please review the attached document for full details.</p>
+                <div class="footer">
+                    Thank you for choosing MNB Shopie.
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg.attach(MIMEText(html_content, 'html'))
+        
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(pdf_bytes)
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f'attachment; filename="{bill_no}_Receipt.pdf"')
+        msg.attach(part)
+        
+        import smtplib
+        server = smtplib.SMTP(smtp_config['server'], int(smtp_config['port']))
+        server.starttls()
+        server.login(smtp_config['user'], smtp_config['password'])
+        server.sendmail(smtp_config['user'], customer_email, msg.as_string())
+        server.quit()
+        return True, "Email sent successfully"
+    except Exception as e:
+        logging.error(f"Error emailing updated receipt: {e}")
+        return False, str(e)
 
 @app.route('/api/billing/complete', methods=['POST'])
 def complete_billing():
@@ -1305,7 +1455,7 @@ def complete_billing():
         try:
             success, smtp_config = get_smtp_config()
             if success and smtp_config and smtp_config.get('user') and smtp_config.get('password'):
-                send_customer_receipt_email(customer_email, cart, total_amount, smtp_config)
+                send_customer_receipt_email(customer_email, cart, total_amount, smtp_config, bill_no)
                 email_sent = True
             else:
                 email_error = "SMTP not configured"
@@ -1363,17 +1513,34 @@ def get_bill_details(bill_no):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/billing/pdf/<bill_no>', methods=['GET'])
+def download_bill_pdf(bill_no):
+    try:
+        import io
+        pdf_bytes = generate_bill_pdf(bill_no)
+        if not pdf_bytes:
+            return jsonify({'error': 'Failed to generate PDF'}), 500
+        return send_file(
+            io.BytesIO(pdf_bytes),
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'{bill_no}_Receipt.pdf'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/billing/refund', methods=['POST'])
 def refund_bill_item():
     data = request.json or {}
     bill_no = data.get('bill_no', '').strip()
     sku = data.get('sku', '').strip()
+    bill_item_id = data.get('bill_item_id')
     try:
         qty_to_refund = int(data.get('quantity', 0))
     except ValueError:
         return jsonify({'error': 'Invalid quantity'}), 400
     
-    if not bill_no or not sku or qty_to_refund <= 0:
+    if not bill_no or qty_to_refund <= 0:
         return jsonify({'error': 'Invalid request parameters'}), 400
         
     try:
@@ -1385,11 +1552,19 @@ def refund_bill_item():
         bill = res_bill.json()[0]
         
         # 2. Fetch target bill item
-        res_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}&sku=eq.{urllib.parse.quote(sku)}", headers=supabase_headers(), timeout=10)
+        if bill_item_id:
+            res_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?id=eq.{bill_item_id}", headers=supabase_headers(), timeout=10)
+        else:
+            res_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}&sku=eq.{urllib.parse.quote(sku)}", headers=supabase_headers(), timeout=10)
+            
         if res_items.status_code != 200 or not res_items.json():
             return jsonify({'error': 'Bill item not found'}), 404
         item = res_items.json()[0]
         
+        # Prevent refund of swapped/exchanged products
+        if item.get('product_name', '').startswith('EXCHANGE:'):
+            return jsonify({'error': 'Exchanged items are non-refundable and non-exchangeable.'}), 400
+            
         # Validate return quantity bounds
         purchased_qty = int(item['quantity'])
         already_returned = int(item.get('returned_quantity', 0) or 0)
@@ -1409,7 +1584,7 @@ def refund_bill_item():
             
         # 4. Increment stock level in inventory
         products = read_inventory()
-        prod = next((p for p in products if p['sku'] == sku), None)
+        prod = next((p for p in products if p['sku'] == item['sku']), None)
         if prod:
             prod['quantity'] = prod['quantity'] + qty_to_refund
             write_inventory(products)
@@ -1422,7 +1597,7 @@ def refund_bill_item():
             'parent_bill_no': bill_no,
             'type': 'refund',
             'date': date_str,
-            'items_involved': [{'sku': sku, 'product_name': item['product_name'], 'quantity': qty_to_refund, 'action': 'refunded'}],
+            'items_involved': [{'sku': item['sku'], 'product_name': item['product_name'], 'quantity': qty_to_refund, 'action': 'refunded'}],
             'cash_delta': -refund_amount
         }
         requests.post(f"{SUPABASE_URL}/rest/v1/transaction_logs", headers=supabase_headers(), json=log_payload, timeout=10)
@@ -1430,28 +1605,38 @@ def refund_bill_item():
         # 6. Append negative sale entry to sales table for analytics compatibility
         record_sale(
             f"REFUND: {item['product_name']}",
-            sku,
+            item['sku'],
             float(item.get('intake_price', 0.0) or 0.0),
             float(item['final_sold_price']),
             -qty_to_refund,
             prod.get('category', 'General') if prod else 'General'
         )
         
-        # 7. Recalculate bill status (check if fully refunded or partially refunded)
+        # 7. Recalculate bill status (check if fully refunded, exchanged, or partially refunded)
         res_all_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
         all_items = res_all_items.json() if res_all_items.status_code == 200 else []
         
         all_fully_returned = True
         any_returned = False
+        any_exchanged = False
         for it in all_items:
+            if it.get('product_name', '').startswith('EXCHANGE:'):
+                any_exchanged = True
             ret = int(it.get('returned_quantity', 0) or 0)
             pur = int(it['quantity'])
             if ret > 0:
                 any_returned = True
-            if ret < pur:
+            if not it.get('product_name', '').startswith('EXCHANGE:') and ret < pur:
                 all_fully_returned = False
                 
-        new_status = 'refunded' if all_fully_returned else ('partially_refunded' if any_returned else 'completed')
+        if any_exchanged:
+            new_status = 'exchanged'
+        elif all_fully_returned and any_returned:
+            new_status = 'refunded'
+        elif any_returned:
+            new_status = 'partially_refunded'
+        else:
+            new_status = 'completed'
         
         # Update bill status
         requests.patch(
@@ -1460,6 +1645,13 @@ def refund_bill_item():
             json={'status': new_status},
             timeout=10
         )
+        
+        # Email updated receipt to customer
+        if bill.get('customer_email'):
+            try:
+                email_updated_receipt(bill_no, 'refund')
+            except Exception as mail_err:
+                logging.error(f"Failed to email refund receipt: {mail_err}")
         
         return jsonify({
             'success': True,
@@ -1475,6 +1667,7 @@ def exchange_bill_item():
     data = request.json or {}
     bill_no = data.get('bill_no', '').strip()
     returned_sku = data.get('returned_sku', '').strip()
+    bill_item_id = data.get('bill_item_id')
     try:
         returned_qty = int(data.get('returned_quantity', 0))
         exchanged_qty = int(data.get('exchanged_quantity', 0))
@@ -1482,7 +1675,7 @@ def exchange_bill_item():
         return jsonify({'error': 'Invalid quantities'}), 400
     exchanged_sku = data.get('exchanged_sku', '').strip()
     
-    if not bill_no or not returned_sku or returned_qty <= 0 or not exchanged_sku or exchanged_qty <= 0:
+    if not bill_no or returned_qty <= 0 or not exchanged_sku or exchanged_qty <= 0:
         return jsonify({'error': 'Invalid request parameters'}), 400
         
     try:
@@ -1494,11 +1687,19 @@ def exchange_bill_item():
         bill = res_bill.json()[0]
         
         # 2. Fetch returned bill item
-        res_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}&sku=eq.{urllib.parse.quote(returned_sku)}", headers=supabase_headers(), timeout=10)
+        if bill_item_id:
+            res_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?id=eq.{bill_item_id}", headers=supabase_headers(), timeout=10)
+        else:
+            res_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}&sku=eq.{urllib.parse.quote(returned_sku)}", headers=supabase_headers(), timeout=10)
+            
         if res_items.status_code != 200 or not res_items.json():
             return jsonify({'error': 'Purchased item not found in bill'}), 404
         ret_item = res_items.json()[0]
         
+        # Prevent exchange of already exchanged products
+        if ret_item.get('product_name', '').startswith('EXCHANGE:'):
+            return jsonify({'error': 'Exchanged items are non-refundable and non-exchangeable.'}), 400
+            
         # Validate returned bounds
         already_returned = int(ret_item.get('returned_quantity', 0) or 0)
         if already_returned + returned_qty > int(ret_item['quantity']):
@@ -1514,7 +1715,7 @@ def exchange_bill_item():
             return jsonify({'error': f'Not enough stock for exchange. Only {exch_prod["quantity"]} units available.'}), 400
             
         # 4. Perform stock movements
-        ret_prod = next((p for p in products if p['sku'] == returned_sku), None)
+        ret_prod = next((p for p in products if p['sku'] == ret_item['sku']), None)
         if ret_prod:
             ret_prod['quantity'] = ret_prod['quantity'] + returned_qty
         exch_prod['quantity'] = exch_prod['quantity'] - exchanged_qty
@@ -1558,7 +1759,7 @@ def exchange_bill_item():
             'type': 'exchange',
             'date': date_str,
             'items_involved': [
-                {'sku': returned_sku, 'product_name': ret_item['product_name'], 'quantity': returned_qty, 'action': 'returned'},
+                {'sku': ret_item['sku'], 'product_name': ret_item['product_name'], 'quantity': returned_qty, 'action': 'returned'},
                 {'sku': exchanged_sku, 'product_name': exch_prod['name'], 'quantity': exchanged_qty, 'action': 'issued'}
             ],
             'cash_delta': cash_delta
@@ -1568,7 +1769,7 @@ def exchange_bill_item():
         # 9. Log transactions to sales table for analytics compatibility
         record_sale(
             f"REFUND: {ret_item['product_name']}",
-            returned_sku,
+            ret_item['sku'],
             float(ret_item.get('intake_price', 0.0) or 0.0),
             float(ret_item['final_sold_price']),
             -returned_qty,
@@ -1583,15 +1784,48 @@ def exchange_bill_item():
             exch_prod.get('category', 'General') or 'General'
         )
         
+        # Recalculate bill status dynamically
+        res_all_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
+        all_items = res_all_items.json() if res_all_items.status_code == 200 else []
+        
+        all_fully_returned = True
+        any_returned = False
+        any_exchanged = False
+        for it in all_items:
+            if it.get('product_name', '').startswith('EXCHANGE:'):
+                any_exchanged = True
+            ret = int(it.get('returned_quantity', 0) or 0)
+            pur = int(it['quantity'])
+            if ret > 0:
+                any_returned = True
+            if not it.get('product_name', '').startswith('EXCHANGE:') and ret < pur:
+                all_fully_returned = False
+                
+        if any_exchanged:
+            new_status = 'exchanged'
+        elif all_fully_returned and any_returned:
+            new_status = 'refunded'
+        elif any_returned:
+            new_status = 'partially_refunded'
+        else:
+            new_status = 'completed'
+            
         # Update bill status & net_amount
         new_net = round(float(bill['net_amount']) + cash_delta, 2)
         requests.patch(
             f"{SUPABASE_URL}/rest/v1/bills?bill_no=eq.{encoded_bill}",
             headers=supabase_headers(),
-            json={'net_amount': new_net, 'status': 'partially_refunded'},
+            json={'net_amount': new_net, 'status': new_status},
             timeout=10
         )
         
+        # Email updated receipt to customer
+        if bill.get('customer_email'):
+            try:
+                email_updated_receipt(bill_no, 'exchange')
+            except Exception as mail_err:
+                logging.error(f"Failed to email exchange receipt: {mail_err}")
+                
         return jsonify({
             'success': True,
             'message': 'Exchange completed successfully',
@@ -2141,6 +2375,65 @@ def save_settings_route():
         logging.error(f"Error saving settings: {e}")
         return jsonify({'success': False, 'message': f'Error saving settings: {str(e)}'}), 500
 
+def read_expenses():
+    """Reads all expenses from Supabase."""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        logging.warning("Supabase URL or Key is missing. Check your environment variables.")
+        return []
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/expenses?select=*&order=date.desc"
+        res = requests.get(url, headers=supabase_headers(), timeout=10)
+        if res.status_code == 200:
+            return res.json()
+        else:
+            logging.error(f"Supabase GET expenses failed: {res.status_code} - {res.text}")
+    except Exception as e:
+        logging.error(f"Error reading Supabase expenses: {e}")
+    return []
+
+@app.route('/api/expenses', methods=['GET'])
+def get_expenses():
+    return jsonify(read_expenses())
+
+@app.route('/api/expenses/add', methods=['POST'])
+def add_expense():
+    data = request.json or {}
+    name = data.get('name', '').strip()
+    try:
+        amount = float(data.get('amount', 0.0))
+    except ValueError:
+        return jsonify({'error': 'Invalid amount'}), 400
+    
+    if not name or amount <= 0:
+        return jsonify({'error': 'Expense name and positive amount required'}), 400
+        
+    now = datetime.datetime.now()
+    date_str = now.strftime("%Y-%m-%d %I:%M %p")
+    
+    payload = {
+        'name': name,
+        'amount': amount,
+        'date': date_str
+    }
+    
+    try:
+        res = requests.post(f"{SUPABASE_URL}/rest/v1/expenses", headers=supabase_headers(), json=payload, timeout=10)
+        if res.status_code in (200, 201):
+            return jsonify({'success': True, 'expense': res.json()[0] if (res.content and isinstance(res.json(), list)) else payload, 'summary': get_sales_summary_data()})
+        return jsonify({'error': f"Failed to save expense: {res.text}"}), res.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/expenses/delete/<int:expense_id>', methods=['POST'])
+def delete_expense(expense_id):
+    try:
+        res = requests.delete(f"{SUPABASE_URL}/rest/v1/expenses?id=eq.{expense_id}", headers=supabase_headers(), timeout=10)
+        if res.status_code in (200, 204):
+            return jsonify({'success': True, 'summary': get_sales_summary_data()})
+        return jsonify({'error': f"Failed to delete expense: {res.text}"}), res.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/analytics/clear', methods=['POST'])
 def clear_analytics():
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -2157,9 +2450,14 @@ def clear_analytics():
         if res_bills.status_code not in (200, 204):
             logging.error(f"Failed to clear bills table: {res_bills.status_code} - {res_bills.text}")
             
+        # Delete all records from expenses table
+        res_exp = requests.delete(f"{SUPABASE_URL}/rest/v1/expenses?id=not.is.null", headers=headers, timeout=10)
+        if res_exp.status_code not in (200, 204):
+            logging.error(f"Failed to clear expenses table: {res_exp.status_code} - {res_exp.text}")
+            
         return jsonify({
             'success': True,
-            'message': 'All sales and billing history cleared successfully!',
+            'message': 'All sales, billing, and nominal expenses history cleared successfully!',
             'summary': get_sales_summary_data()
         })
     except Exception as e:
@@ -2169,6 +2467,10 @@ def clear_analytics():
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     sales = read_sales()
+    expenses = read_expenses()
+    
+    total_expenses = sum(float(e.get('amount', 0.0) or 0.0) for e in expenses)
+    
     timeline_data = {} # date -> {revenue, profit, quantity}
     product_data = {} # sku -> {name, units_sold, revenue, profit}
     
@@ -2223,7 +2525,8 @@ def get_analytics():
     # Sort products by revenue
     sorted_products = sorted(list(product_data.values()), key=lambda x: x['revenue'], reverse=True)
     
-    margin = (total_profit / total_revenue * 100.0) if total_revenue > 0 else 0.0
+    net_profit = total_profit - total_expenses
+    margin = (net_profit / total_revenue * 100.0) if total_revenue > 0 else 0.0
     
     # Round float values
     for t in sorted_timeline:
@@ -2236,12 +2539,15 @@ def get_analytics():
     return jsonify({
         'summary': {
             'total_revenue': round(total_revenue, 2),
-            'total_profit': round(total_profit, 2),
+            'total_profit': round(net_profit, 2),
             'total_items_sold': total_items_sold,
-            'margin': round(margin, 2)
+            'margin': round(margin, 2),
+            'total_sales_profit': round(total_profit, 2),
+            'total_expenses': round(total_expenses, 2)
         },
         'timeline': sorted_timeline,
-        'products': sorted_products
+        'products': sorted_products,
+        'expenses': expenses
     })
 
 @app.route('/api/network-info', methods=['GET'])

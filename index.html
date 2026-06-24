@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MNB Shopie — Enterprise Inventory</title>
+    <link rel="icon" type="image/png" href="image.png">
     <meta name="description" content="Enterprise-grade inventory and billing management system.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,17 +17,19 @@
     <!-- Top Navigation Bar -->
     <nav class="topbar">
         <div class="topbar-inner">
-            <div class="brand">
-                <img src="image.png" alt="Logo" class="brand-logo">
-                <div class="brand-text">
-                    <h1>MNB Shopie</h1>
-                    <span class="version-badge">ENTERPRISE</span>
+            <div class="brand" style="display: flex; align-items: center; gap: 0.75rem;">
+                <img src="image.png" alt="MNB Shopie Logo" style="height: 38px; width: auto; border-radius: 8px;">
+                <div class="brand-text" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <h1 style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary); margin: 0; font-family: 'Inter', sans-serif; letter-spacing: -0.02em;">
+                        MNB <span style="font-weight: 400; color: var(--text-secondary);">Shopie</span>
+                    </h1>
+                    <span class="version-badge" style="background: rgba(79, 70, 229, 0.1); color: var(--primary); font-weight: 700; font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.05em; text-transform: uppercase;">System</span>
                 </div>
             </div>
             
             <div class="nav-links">
-                <a href="#" class="nav-link active" id="navStockBtn">Stock Dashboard</a>
-                <a href="#" class="nav-link" id="navBillingBtn">Billing & Refunds</a>
+                <a href="#stock" class="nav-link active" id="navStockBtn">Stock Dashboard</a>
+                <a href="#billing" class="nav-link" id="navBillingBtn">Billing & Refunds</a>
                 <a href="/analytics.html" class="nav-link">Business Analytics</a>
                 <a href="/logout" class="nav-link text-red">Logout</a>
             </div>
@@ -52,16 +55,10 @@
             <div id="stockDashboardView">
                 <!-- Header Section -->
                 <header class="page-header" style="align-items: flex-start;">
-                <div class="header-titles">
-                    <div class="welcome-banner" style="display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1rem; flex-wrap: wrap;">
-                        <img src="image.png" alt="MNB Shopie Logo" style="height: 72px; width: auto; border-radius: var(--radius-md); box-shadow: var(--shadow-card); border: 2px solid var(--border-light);">
-                        <div>
-                            <h2 style="font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); margin: 0;">MNB Shopie</h2>
-                            <p style="font-size: 0.95rem; color: var(--primary); font-weight: 600; margin: 0.2rem 0 0;">A one stop shop, for all your needs!</p>
-                        </div>
+                    <div class="header-titles">
+                        <h2 style="font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); margin: 0;">Stock Dashboard</h2>
+                        <p class="header-subtitle" style="margin-left: 0.25rem; font-size: 0.9rem; color: var(--text-secondary);">Manage your inventory, scan new items, and process billing.</p>
                     </div>
-                    <p class="header-subtitle" style="margin-left: 0.25rem; font-size: 0.9rem; color: var(--text-secondary);">Manage your inventory, scan new items, and process billing.</p>
-                </div>
                 <div class="header-controls">
                     <div class="mode-toggle-group glass-panel">
                         <button class="btn-mode active" id="modeIntakeBtn" data-mode="intake">

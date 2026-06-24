@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MNB Shopie — Business Analytics & Insights</title>
+    <link rel="icon" type="image/png" href="image.png">
     <meta name="description" content="Business analytics, sales metrics, and profit insights for MNB Shopie inventory and billing management system.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,13 +16,18 @@
     <!-- Top Navigation Bar -->
     <nav class="topbar">
         <div class="topbar-inner">
-            <div class="brand" style="gap: 0.75rem;">
-                <img src="image.png" alt="MNB Shopie Logo" style="height: 32px; width: auto; border-radius: var(--radius-sm);">
-                <h1 style="font-size: 1.25rem;">MNB Shopie</h1>
-                <span class="version-badge" style="background: var(--primary-light); color: var(--primary); font-weight: 700;">System</span>
+            <div class="brand" style="display: flex; align-items: center; gap: 0.75rem;">
+                <img src="image.png" alt="MNB Shopie Logo" style="height: 38px; width: auto; border-radius: 8px;">
+                <div class="brand-text" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <h1 style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary); margin: 0; font-family: 'Inter', sans-serif; letter-spacing: -0.02em;">
+                        MNB <span style="font-weight: 400; color: var(--text-secondary);">Shopie</span>
+                    </h1>
+                    <span class="version-badge" style="background: rgba(79, 70, 229, 0.1); color: var(--primary); font-weight: 700; font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.05em; text-transform: uppercase;">System</span>
+                </div>
             </div>
             <div class="nav-links">
-                <a href="/" class="nav-link">Stock Dashboard</a>
+                <a href="/#stock" class="nav-link">Stock Dashboard</a>
+                <a href="/#billing" class="nav-link">Billing & Refunds</a>
                 <a href="/analytics.html" class="nav-link active">Business Analytics</a>
                 <a href="/logout" class="nav-link text-red">Logout</a>
             </div>
@@ -159,6 +165,50 @@
                     </table>
                 </div>
             </section>
+            
+            <!-- Expenses Section -->
+            <section class="analytics-card full-width-card" style="margin-top: 1.5rem;">
+                <div class="card-header-with-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h2>Business Expenses Log</h2>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: #f43f5e;" id="totalExpensesDisplay">Total Expenses: Rs. 0.00</div>
+                </div>
+                <p class="card-hint" style="margin-bottom: 1.5rem;">Log business operations costs (salaries, electricity bills, rent, internet etc.). These are deducted from gross profit for true Net Profit calculations.</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+                    <!-- Add Expense Form -->
+                    <div style="background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: var(--radius-md); border: 1px dashed rgba(255,255,255,0.12);">
+                        <h3 style="margin-top: 0; margin-bottom: 1.25rem; font-size: 1rem; color: var(--text-primary);">Log New Expense</h3>
+                        <form id="addExpenseForm" onsubmit="submitExpense(event)">
+                            <div style="margin-bottom: 1rem;">
+                                <label style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Expense Description</label>
+                                <input type="text" id="expenseName" placeholder="e.g. Employee Salaries, Electricity Bill" required style="width: 100%; padding: 0.75rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: var(--radius-sm); color: var(--text-primary); font-family: inherit; font-size: 0.9rem;">
+                            </div>
+                            <div style="margin-bottom: 1.5rem;">
+                                <label style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Amount (Rs.)</label>
+                                <input type="number" step="0.01" id="expenseAmount" placeholder="0.00" required style="width: 100%; padding: 0.75rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: var(--radius-sm); color: var(--text-primary); font-family: inherit; font-size: 0.9rem;">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: 100%; font-weight: 600; padding: 0.75rem;">Record Expense</button>
+                        </form>
+                    </div>
+                    
+                    <!-- Expense List Table -->
+                    <div class="table-wrap" style="max-height: 350px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-md);">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Logged Date</th>
+                                    <th>Expense Name / Description</th>
+                                    <th style="text-align: right;">Amount (Rs.)</th>
+                                    <th style="text-align: center; width: 100px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expensesTableBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 
@@ -217,11 +267,95 @@
                 renderProfitShareChart(analyticsData.products);
                 renderSalesLogs(analyticsData.timeline);
                 renderSalesTable(analyticsData.products, analyticsData.timeline);
+                renderExpenses(analyticsData.expenses, analyticsData.summary);
             } catch (err) {
                 console.error('Error loading analytics:', err);
                 showToast('Failed to load analytical data', 'error');
             }
         }
+        
+        function renderExpenses(expenses, summary) {
+            const displayVal = summary ? summary.total_expenses : 0.0;
+            document.getElementById('totalExpensesDisplay').textContent = `Total Expenses: Rs. ${parseFloat(displayVal || 0).toFixed(2)}`;
+            
+            const tbody = document.getElementById('expensesTableBody');
+            tbody.innerHTML = '';
+            
+            if (!expenses || expenses.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:2rem; color:var(--text-tertiary);">No nominal expenses logged yet.</td></tr>`;
+                return;
+            }
+            
+            expenses.forEach(e => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><code>${e.date}</code></td>
+                    <td><strong style="color:var(--text-primary);">${e.name}</strong></td>
+                    <td style="text-align: right; font-weight: 700; color: #f43f5e;">Rs. ${parseFloat(e.amount).toFixed(2)}</td>
+                    <td style="text-align: center;">
+                        <button class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-color: #f43f5e; color: #f43f5e;" onclick="deleteExpense(${e.id})">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        async function submitExpense(event) {
+            event.preventDefault();
+            const nameInput = document.getElementById('expenseName');
+            const amountInput = document.getElementById('expenseAmount');
+            
+            const name = nameInput.value.trim();
+            const amount = parseFloat(amountInput.value);
+            
+            if (!name || isNaN(amount) || amount <= 0) {
+                showToast('Please enter a valid name and positive amount', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${BASE_URL}/api/expenses/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, amount })
+                });
+                
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast('Expense logged successfully!');
+                    nameInput.value = '';
+                    amountInput.value = '';
+                    loadAnalyticsData();
+                } else {
+                    showToast(data.error || 'Failed to add expense', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Network error logging expense', 'error');
+            }
+        }
+        
+        async function deleteExpense(id) {
+            if (!confirm('Are you sure you want to delete this expense?')) return;
+            try {
+                const res = await fetch(`${BASE_URL}/api/expenses/delete/${id}`, {
+                    method: 'POST'
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast('Expense deleted successfully!');
+                    loadAnalyticsData();
+                } else {
+                    showToast(data.error || 'Failed to delete expense', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Network error deleting expense', 'error');
+            }
+        }
+        
+        window.deleteExpense = deleteExpense;
+        window.submitExpense = submitExpense;
         
         function renderKPIs(summary) {
             document.getElementById('kpiRevenue').textContent = `Rs. ${summary.total_revenue.toFixed(2)}`;
@@ -424,28 +558,32 @@
             
             allSales.reverse();
             
-            if (allSales.length === 0) {
-                empty.style.display = 'flex';
-                return;
+            if (empty) {
+                if (allSales.length === 0) {
+                    empty.style.display = 'flex';
+                    return;
+                }
+                empty.style.display = 'none';
             }
-            empty.style.display = 'none';
             
-            container.innerHTML = '';
-            allSales.slice(0, 10).forEach(sale => {
-                const item = document.createElement('div');
-                item.className = 'sale-log-item';
-                item.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:160px;">${sale.product_name}</span>
-                        <span style="font-weight:700; color:#10b981; font-size:0.85rem;">+Rs. ${(sale.sold_price * sale.quantity).toFixed(2)}</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.72rem; color:var(--text-tertiary);">
-                        <span>Qty: ${sale.quantity} · Profit: Rs. ${sale.profit.toFixed(2)}</span>
-                        <span>${sale.date}${sale.time ? ' ' + sale.time : ''}</span>
-                    </div>
-                `;
-                container.appendChild(item);
-            });
+            if (container) {
+                container.innerHTML = '';
+                allSales.slice(0, 10).forEach(sale => {
+                    const item = document.createElement('div');
+                    item.className = 'sale-log-item';
+                    item.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:160px;">${sale.product_name}</span>
+                            <span style="font-weight:700; color:#10b981; font-size:0.85rem;">+Rs. ${(sale.sold_price * sale.quantity).toFixed(2)}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.72rem; color:var(--text-tertiary);">
+                            <span>Qty: ${sale.quantity} · Profit: Rs. ${sale.profit.toFixed(2)}</span>
+                            <span>${sale.date}${sale.time ? ' ' + sale.time : ''}</span>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                });
+            }
         }
         
         let salesTableRowsData = [];

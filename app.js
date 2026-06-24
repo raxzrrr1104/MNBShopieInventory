@@ -1737,6 +1737,35 @@ function initBillingHistoryFeature() {
     if (btnSubmitReturnWizard) {
         btnSubmitReturnWizard.addEventListener('click', submitReturnWizard);
     }
+
+    // Hash checking on load
+    if (window.location.hash === '#billing') {
+        navBillingBtn.classList.add('active');
+        navStockBtn.classList.remove('active');
+        stockDashboardView.style.display = 'none';
+        billingHistoryView.style.display = 'block';
+        fetchBillingHistory();
+    } else {
+        navStockBtn.classList.add('active');
+        navBillingBtn.classList.remove('active');
+        stockDashboardView.style.display = 'block';
+        billingHistoryView.style.display = 'none';
+    }
+
+    window.addEventListener('hashchange', () => {
+        if (window.location.hash === '#billing') {
+            navBillingBtn.classList.add('active');
+            navStockBtn.classList.remove('active');
+            stockDashboardView.style.display = 'none';
+            billingHistoryView.style.display = 'block';
+            fetchBillingHistory();
+        } else if (window.location.hash === '#stock' || window.location.hash === '') {
+            navStockBtn.classList.add('active');
+            navBillingBtn.classList.remove('active');
+            stockDashboardView.style.display = 'block';
+            billingHistoryView.style.display = 'none';
+        }
+    });
 }
 
 async function fetchBillingHistory() {
@@ -1781,6 +1810,8 @@ function renderBillsList() {
             statusBadge = '<span class="status-badge status-completed">Completed</span>';
         } else if (bill.status === 'partially_refunded') {
             statusBadge = '<span class="status-badge status-partially_refunded">Partially Returned</span>';
+        } else if (bill.status === 'exchanged') {
+            statusBadge = '<span class="status-badge" style="background: rgba(79, 70, 229, 0.15); color: #818cf8; padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">Exchanged</span>';
         } else {
             statusBadge = '<span class="status-badge status-refunded">Refunded</span>';
         }
@@ -1793,8 +1824,9 @@ function renderBillsList() {
             <td style="text-align: right; color: var(--accent-red); font-weight: 600;">$${parseFloat(bill.discount_share || bill.discount_value || 0).toFixed(2)}</td>
             <td style="text-align: right; font-weight: 700; color: var(--primary);">$${parseFloat(bill.net_amount).toFixed(2)}</td>
             <td style="text-align: center;">${statusBadge}</td>
-            <td style="text-align: center;">
+            <td style="text-align: center; display: flex; justify-content: center; gap: 0.5rem; align-items: center;">
                 <button class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="openBillDetails('${bill.bill_no}')">Details</button>
+                <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="downloadBillPDF('${bill.bill_no}')">PDF</button>
             </td>
         `;
         billsTableBody.appendChild(tr);
@@ -1824,6 +1856,8 @@ async function openBillDetails(billNo) {
             statusText = '<span style="color: var(--success);">COMPLETED</span>';
         } else if (bill.status === 'partially_refunded') {
             statusText = '<span style="color: var(--warning);">PARTIALLY RETURNED</span>';
+        } else if (bill.status === 'exchanged') {
+            statusText = '<span style="color: #818cf8; font-weight: 700;">EXCHANGED</span>';
         } else {
             statusText = '<span style="color: var(--danger);">FULLY REFUNDED</span>';
         }
@@ -1846,11 +1880,14 @@ async function openBillDetails(billNo) {
             
             const purchased = parseInt(item.quantity);
             const returned = parseInt(item.returned_quantity || 0);
-            const isRefundable = returned < purchased && bill.status !== 'refunded';
+            const isExchanged = item.product_name.startsWith('EXCHANGE:');
+            const isRefundable = returned < purchased && bill.status !== 'refunded' && !isExchanged;
             
             let actionBtn = '';
             if (isRefundable) {
                 actionBtn = `<button class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-color: var(--warning); color: var(--warning);" onclick="openReturnWizard('${bill.bill_no}', '${item.sku}', ${JSON.stringify(item).replace(/"/g, '&quot;')})">Return / Swap</button>`;
+            } else if (isExchanged) {
+                actionBtn = `<span style="font-size: 0.8rem; color:#888; font-style: italic; font-weight: 500;">Exchanged Item (Non-Refundable)</span>`;
             } else {
                 actionBtn = `<span style="font-size: 0.8rem; color:#aaa;">No Action</span>`;
             }
@@ -1972,6 +2009,10 @@ async function submitReturnWizard() {
     }
     
     const maxRefundable = parseInt(activeWizardItem.quantity) - parseInt(activeWizardItem.returned_quantity || 0);
+    if (maxRefundable <= 0) {
+        showToast('This item has already been fully returned or exchanged', 'error');
+        return;
+    }
     if (returnQty > maxRefundable) {
         showToast(`Cannot return more than ${maxRefundable} units`, 'error');
         return;
@@ -1989,6 +2030,7 @@ async function submitReturnWizard() {
                 body: JSON.stringify({
                     bill_no: activeWizardBillNo,
                     sku: activeWizardSku,
+                    bill_item_id: activeWizardItem.id,
                     quantity: returnQty
                 })
             });
@@ -1996,7 +2038,7 @@ async function submitReturnWizard() {
             if (res.ok && data.success) {
                 showToast('Refund processed successfully!', 'success');
                 closeModal(returnWizardModal);
-                closeModal(billDetailsModal);
+                openBillDetails(activeWizardBillNo); // Re-open and refresh details modal
                 
                 // Sync local state
                 inventory = data.inventory || inventory;
@@ -2031,6 +2073,7 @@ async function submitReturnWizard() {
                 body: JSON.stringify({
                     bill_no: activeWizardBillNo,
                     returned_sku: activeWizardSku,
+                    bill_item_id: activeWizardItem.id,
                     returned_quantity: returnQty,
                     exchanged_sku: exchSku,
                     exchanged_quantity: exchQty
@@ -2040,7 +2083,7 @@ async function submitReturnWizard() {
             if (res.ok && data.success) {
                 showToast('Exchange processed successfully!', 'success');
                 closeModal(returnWizardModal);
-                closeModal(billDetailsModal);
+                openBillDetails(activeWizardBillNo); // Re-open and refresh details modal
                 
                 // Sync local state
                 inventory = data.inventory || inventory;
@@ -2103,3 +2146,34 @@ if (btnClearAnalyticsBtn) {
         }
     });
 }
+
+async function downloadBillPDF(billNo) {
+    try {
+        showToast('Preparing download...', 'info');
+        const res = await fetch(`${BASE_URL}/api/billing/pdf/${billNo}`);
+        if (!res.ok) {
+            if (res.status === 401) {
+                showToast('Session expired, please login again', 'error');
+            } else {
+                showToast('Failed to download PDF', 'error');
+            }
+            return;
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `${billNo}_Receipt.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showToast('PDF downloaded successfully!');
+    } catch (err) {
+        console.error('Error downloading PDF:', err);
+        showToast('Network error downloading PDF', 'error');
+    }
+}
+
+window.downloadBillPDF = downloadBillPDF;
