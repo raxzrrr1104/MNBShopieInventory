@@ -1092,33 +1092,51 @@ def generate_bill_pdf(bill_no):
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib import colors
         
+        # Calculate dynamic page size for RP 3160 Gold (80mm width)
+        # 80mm in points is ~226. Margins of 10 points left and right leaves 206 points of printable width.
+        page_width = 226
+        
+        # Base height estimate: margins, stacked header elements, status block, greeting footer, spacers.
+        base_height = 190
+        
+        # Items table height estimate: header row, actual items, spacing/total rows.
+        item_height = 20 + (len(items) * 18) + 30
+        
+        # Logs height estimate.
+        log_height = (20 + (len(logs) * 20)) if logs else 0
+        
+        calculated_height = max(350, base_height + item_height + log_height)
+        pagesize = (page_width, calculated_height)
+        
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=54, leftMargin=54, topMargin=54, bottomMargin=54)
+        doc = SimpleDocTemplate(buffer, pagesize=pagesize, rightMargin=10, leftMargin=10, topMargin=10, bottomMargin=10)
         story = []
         styles = getSampleStyleSheet()
         
         title_style = ParagraphStyle(
             'DocTitle',
             fontName='Helvetica-Bold',
-            fontSize=22,
-            leading=26,
+            fontSize=12,
+            leading=15,
             textColor=colors.HexColor('#1e293b'),
+            alignment=1
         )
         
         subtitle_style = ParagraphStyle(
             'DocSubTitle',
             fontName='Helvetica',
-            fontSize=9.5,
-            leading=13,
+            fontSize=8,
+            leading=11,
             textColor=colors.HexColor('#64748b'),
-            spaceAfter=15
+            spaceAfter=8,
+            alignment=1
         )
         
         body_style = ParagraphStyle(
             'DocBody',
             fontName='Helvetica',
-            fontSize=9,
-            leading=13,
+            fontSize=8,
+            leading=11,
             textColor=colors.HexColor('#334155')
         )
         
@@ -1134,49 +1152,33 @@ def generate_bill_pdf(bill_no):
         if os.path.exists(logo_path):
             try:
                 from reportlab.platypus import Image as RLImage
-                # 120 width, 38 height keeps aspect ratio perfect
-                brand_logo = RLImage(logo_path, width=120, height=38)
+                # Scale down for narrow 80mm layout (max content width is 206)
+                brand_logo = RLImage(logo_path, width=80, height=25)
+                brand_logo.hAlign = 'CENTER'
             except Exception as logo_err:
                 logging.error(f"Error loading brand logo for PDF: {logo_err}")
-
-        # Header Section
-        header_left_flow = []
+ 
+        # Stacked Header Section (optimized for narrow thermal paper)
         if brand_logo:
-            header_left_flow.append(brand_logo)
-            header_left_flow.append(Spacer(1, 4))
-        header_left_flow.append(Paragraph("<b>MNB Shopie — Curated Imported Luxury</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=10, leading=14, textColor=colors.HexColor('#1e293b'))))
-        header_left_flow.append(Paragraph("A one stop shop, for all your needs!", subtitle_style))
-
-        header_data = [
-            [
-                header_left_flow,
-                [
-                    Paragraph(f"<b>INVOICE {bill_no}</b>", ParagraphStyle('InvoiceTitle', fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor('#4f46e5'), alignment=2)),
-                    Spacer(1, 4),
-                    Paragraph(f"Date: {bill['date']}", ParagraphStyle('InvoiceDate', fontName='Helvetica', fontSize=9, leading=13, textColor=colors.HexColor('#64748b'), alignment=2))
-                ]
-            ]
-        ]
+            story.append(brand_logo)
+            story.append(Spacer(1, 4))
+        story.append(Paragraph("<b>MNB Shopie — Curated Imported Luxury</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=9, leading=12, textColor=colors.HexColor('#1e293b'), alignment=1)))
+        story.append(Paragraph("A one stop shop, for all your needs!", subtitle_style))
         
-        header_table = Table(header_data, colWidths=[252, 252])
-        header_table.setStyle(TableStyle([
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('PADDING', (0,0), (-1,-1), 0),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-        ]))
-        story.append(header_table)
-        story.append(Spacer(1, 10))
+        story.append(Paragraph(f"<b>INVOICE {bill_no}</b>", ParagraphStyle('InvoiceTitle', fontName='Helvetica-Bold', fontSize=10, leading=14, textColor=colors.HexColor('#4f46e5'), alignment=1)))
+        story.append(Paragraph(f"Date: {bill['date']}", ParagraphStyle('InvoiceDate', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#64748b'), alignment=1)))
+        story.append(Spacer(1, 5))
         
-        # Decorative colored line
-        line_table = Table([[""]], colWidths=[504])
+        # Decorative colored line (width 206)
+        line_table = Table([[""]], colWidths=[206])
         line_table.setStyle(TableStyle([
-            ('LINEBELOW', (0,0), (-1,-1), 2, colors.HexColor('#4f46e5')),
+            ('LINEBELOW', (0,0), (-1,-1), 1.5, colors.HexColor('#4f46e5')),
             ('PADDING', (0,0), (-1,-1), 0),
             ('BOTTOMPADDING', (0,0), (-1,-1), 0),
             ('TOPPADDING', (0,0), (-1,-1), 0),
         ]))
         story.append(line_table)
-        story.append(Spacer(1, 15))
+        story.append(Spacer(1, 8))
         
         # Billing Metadata Table
         status_colors = {
@@ -1197,32 +1199,32 @@ def generate_bill_pdf(bill_no):
         
         billing_data = [
             [Paragraph("<b>Billed To:</b>", body_bold), Paragraph(bill['customer_email'] if bill['customer_email'] else "Walk-in Customer", body_style)],
-            [Paragraph("<b>Invoice Status:</b>", body_bold), Paragraph(status_label, ParagraphStyle('InvoiceStatus', parent=body_style, textColor=colors.HexColor(status_color), fontName='Helvetica-Bold'))]
+            [Paragraph("<b>Status:</b>", body_bold), Paragraph(status_label, ParagraphStyle('InvoiceStatus', parent=body_style, textColor=colors.HexColor(status_color), fontName='Helvetica-Bold'))]
         ]
-        billing_table = Table(billing_data, colWidths=[100, 404])
+        billing_table = Table(billing_data, colWidths=[50, 156])
         billing_table.setStyle(TableStyle([
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('PADDING', (0,0), (-1,-1), 2),
+            ('PADDING', (0,0), (-1,-1), 1),
             ('LEFTPADDING', (0,0), (-1,-1), 0),
         ]))
         story.append(billing_table)
-        story.append(Spacer(1, 20))
+        story.append(Spacer(1, 10))
         
         # Items Table Headers
-        th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=8.5, leading=11, textColor=colors.HexColor('#475569'))
+        th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#475569'))
         th_right = ParagraphStyle('THRight', parent=th_style, alignment=2)
         th_center = ParagraphStyle('THCenter', parent=th_style, alignment=1)
         
         items_data = [[
-            Paragraph("Product Description", th_style),
-            Paragraph("Unit Price", th_right),
+            Paragraph("Item", th_style),
+            Paragraph("Price", th_right),
             Paragraph("Qty", th_center),
             Paragraph("Ret", th_center),
-            Paragraph("Net Amount", th_right)
+            Paragraph("Total", th_right)
         ]]
         
         # Populate items
-        td_style = ParagraphStyle('TD', fontName='Helvetica', fontSize=9, leading=12, textColor=colors.HexColor('#0f172a'))
+        td_style = ParagraphStyle('TD', fontName='Helvetica', fontSize=7.5, leading=10, textColor=colors.HexColor('#0f172a'))
         td_right = ParagraphStyle('TDRight', parent=td_style, alignment=2)
         td_center = ParagraphStyle('TDCenter', parent=td_style, alignment=1)
         
@@ -1236,10 +1238,10 @@ def generate_bill_pdf(bill_no):
             
             items_data.append([
                 Paragraph(name, td_style),
-                Paragraph(f"Rs. {price:.2f}", td_right),
+                Paragraph(f"{price:.2f}", td_right),
                 Paragraph(str(qty), td_center),
                 Paragraph(str(returned) if returned > 0 else "0", td_center),
-                Paragraph(f"Rs. {subtotal:.2f}", td_right)
+                Paragraph(f"{subtotal:.2f}", td_right)
             ])
             
         # spacing row
@@ -1248,47 +1250,47 @@ def generate_bill_pdf(bill_no):
         # Grand Total row
         items_data.append([
             "", "", "",
-            Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=10, leading=13, alignment=2, textColor=colors.HexColor('#0f172a'))),
-            Paragraph(f"<b>Rs. {float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=11, leading=13, alignment=2, textColor=colors.HexColor('#4f46e5')))
+            Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.HexColor('#0f172a'))),
+            Paragraph(f"<b>Rs. {float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.HexColor('#4f46e5')))
         ])
         
-        items_table = Table(items_data, colWidths=[204, 80, 50, 50, 120])
+        items_table = Table(items_data, colWidths=[90, 42, 17, 17, 40])
         items_table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f8fafc')),
-            ('TOPPADDING', (0,0), (-1,0), 6),
-            ('BOTTOMPADDING', (0,0), (-1,0), 6),
+            ('TOPPADDING', (0,0), (-1,0), 4),
+            ('BOTTOMPADDING', (0,0), (-1,0), 4),
             ('LINEBELOW', (0,0), (-1,0), 1, colors.HexColor('#e2e8f0')),
             
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('TOPPADDING', (0,1), (-1,-3), 6),
-            ('BOTTOMPADDING', (0,1), (-1,-3), 6),
+            ('TOPPADDING', (0,1), (-1,-3), 4),
+            ('BOTTOMPADDING', (0,1), (-1,-3), 4),
             ('LINEBELOW', (0,1), (-1,-3), 0.5, colors.HexColor('#f1f5f9')),
             
-            ('LINEABOVE', (3,-1), (4,-1), 1.5, colors.HexColor('#cbd5e1')),
-            ('TOPPADDING', (3,-1), (4,-1), 10),
-            ('BOTTOMPADDING', (3,-1), (4,-1), 10),
+            ('LINEABOVE', (3,-1), (4,-1), 1.2, colors.HexColor('#cbd5e1')),
+            ('TOPPADDING', (3,-1), (4,-1), 6),
+            ('BOTTOMPADDING', (3,-1), (4,-1), 6),
         ]))
         story.append(items_table)
-        story.append(Spacer(1, 15))
+        story.append(Spacer(1, 10))
         
         # Activity Logs Section in PDF
         if logs:
-            story.append(Paragraph("<b>Transaction Return & Exchange Logs</b>", ParagraphStyle('LogTitle', fontName='Helvetica-Bold', fontSize=10, leading=14, textColor=colors.HexColor('#1e293b'))))
-            story.append(Spacer(1, 5))
+            story.append(Paragraph("<b>Return & Exchange Logs</b>", ParagraphStyle('LogTitle', fontName='Helvetica-Bold', fontSize=8, leading=11, textColor=colors.HexColor('#1e293b'))))
+            story.append(Spacer(1, 3))
             for log in logs:
                 log_items_str = ", ".join([f"{it['action'].upper()}: {it['quantity']}x {it['product_name']}" for it in log.get('items_involved', [])])
-                cash_str = f"Cash Adjustment: Rs. {float(log.get('cash_delta', 0.0)):.2f}"
-                log_p_style = ParagraphStyle('LogP', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#475569'))
+                cash_str = f"Delta: Rs. {float(log.get('cash_delta', 0.0)):.2f}"
+                log_p_style = ParagraphStyle('LogP', fontName='Helvetica', fontSize=7, leading=10, textColor=colors.HexColor('#475569'))
                 story.append(Paragraph(f"• <b>[{log['date']}] {log['type'].upper()}:</b> {log_items_str} ({cash_str})", log_p_style))
-                story.append(Spacer(1, 3))
-            story.append(Spacer(1, 15))
+                story.append(Spacer(1, 2))
+            story.append(Spacer(1, 10))
             
         # Greeting
         footer_style = ParagraphStyle(
             'DocFooter',
             fontName='Helvetica-Oblique',
-            fontSize=8.5,
-            leading=12,
+            fontSize=7,
+            leading=10,
             textColor=colors.HexColor('#94a3b8'),
             alignment=1
         )
