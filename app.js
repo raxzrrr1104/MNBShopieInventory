@@ -848,6 +848,39 @@ function updateFilterBadges() {
 function updateStats() {
     totalSKUs.textContent = inventory.length;
     totalQty.textContent = inventory.reduce((s, i) => s + i.quantity, 0);
+
+    const breakdownContainer = document.getElementById('categoryBreakdown');
+    if (breakdownContainer) {
+        breakdownContainer.innerHTML = '';
+        const totals = {};
+        
+        // Sum quantities for each category present in current inventory
+        inventory.forEach(item => {
+            const cat = item.category || 'General';
+            totals[cat] = (totals[cat] || 0) + (item.quantity || 0);
+        });
+
+        // Add entries for any categories that have zero stock
+        if (typeof categories !== 'undefined') {
+            categories.forEach(cat => {
+                if (!totals[cat]) {
+                    totals[cat] = 0;
+                }
+            });
+        }
+
+        // Render each category's total units
+        const sortedCats = Object.keys(totals).sort();
+        sortedCats.forEach(cat => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.justifyContent = 'space-between';
+            row.style.alignItems = 'center';
+            row.style.gap = '0.75rem';
+            row.innerHTML = `<span style="font-weight: 500;">${cat}</span><span style="font-weight: 700; color: var(--success);">${totals[cat]}</span>`;
+            breakdownContainer.appendChild(row);
+        });
+    }
 }
 
 // --- Chart ---
