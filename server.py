@@ -1278,29 +1278,53 @@ def generate_bill_pdf(bill_no):
         # spacing row
         items_data.append(["", "", "", "", ""])
         
-        # Grand Total row
+        # Subtotal, Discount, Net Paid rows
+        total_amt = float(bill.get('total_amount', 0.0) or 0.0)
+        net_amt = float(bill.get('net_amount', 0.0) or 0.0)
+        discount_amt = total_amt - net_amt
+        
+        if discount_amt > 0:
+            discount_type = bill.get('discount_type', 'none')
+            discount_val = float(bill.get('discount_value', 0.0) or 0.0)
+            disc_label = f"Discount ({discount_val:.0f}%)" if discount_type == 'percent' else "Discount"
+            
+            items_data.append([
+                "", "", "",
+                Paragraph("Subtotal", ParagraphStyle('SubTotalLabel', fontName='Helvetica', fontSize=9.5, leading=12, alignment=2, textColor=colors.HexColor('#475569'))),
+                Paragraph(f"Rs. {total_amt:.2f}", ParagraphStyle('SubTotalVal', fontName='Helvetica', fontSize=9.5, leading=12, alignment=2, textColor=colors.HexColor('#475569')))
+            ])
+            items_data.append([
+                "", "", "",
+                Paragraph(disc_label, ParagraphStyle('DiscLabel', fontName='Helvetica', fontSize=9.5, leading=12, alignment=2, textColor=colors.HexColor('#b91c1c'))),
+                Paragraph(f"- Rs. {discount_amt:.2f}", ParagraphStyle('DiscVal', fontName='Helvetica', fontSize=9.5, leading=12, alignment=2, textColor=colors.HexColor('#b91c1c')))
+            ])
+            
         items_data.append([
             "", "", "",
             Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=10, leading=13, alignment=2, textColor=colors.HexColor('#0f172a'))),
-            Paragraph(f"<b>Rs. {float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=11, leading=13, alignment=2, textColor=colors.HexColor('#4f46e5')))
+            Paragraph(f"<b>Rs. {net_amt:.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=11, leading=13, alignment=2, textColor=colors.HexColor('#4f46e5')))
         ])
         
         items_table = Table(items_data, colWidths=[204, 80, 50, 50, 120])
-        items_table.setStyle(TableStyle([
+        
+        # Build dynamic style table
+        num_items = len(items)
+        t_style = [
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f8fafc')),
             ('TOPPADDING', (0,0), (-1,0), 6),
             ('BOTTOMPADDING', (0,0), (-1,0), 6),
             ('LINEBELOW', (0,0), (-1,0), 1, colors.HexColor('#e2e8f0')),
             
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('TOPPADDING', (0,1), (-1,-3), 6),
-            ('BOTTOMPADDING', (0,1), (-1,-3), 6),
-            ('LINEBELOW', (0,1), (-1,-3), 0.5, colors.HexColor('#f1f5f9')),
+            ('TOPPADDING', (0,1), (-1, num_items), 6),
+            ('BOTTOMPADDING', (0,1), (-1, num_items), 6),
+            ('LINEBELOW', (0,1), (-1, num_items), 0.5, colors.HexColor('#f1f5f9')),
             
             ('LINEABOVE', (3,-1), (4,-1), 1.5, colors.HexColor('#cbd5e1')),
-            ('TOPPADDING', (3,-1), (4,-1), 10),
-            ('BOTTOMPADDING', (3,-1), (4,-1), 10),
-        ]))
+            ('TOPPADDING', (3,-1), (4,-1), 8),
+            ('BOTTOMPADDING', (3,-1), (4,-1), 8),
+        ]
+        items_table.setStyle(TableStyle(t_style))
         story.append(items_table)
         story.append(Spacer(1, 15))
         
@@ -1381,7 +1405,14 @@ def generate_bill_thermal_pdf(bill_no):
             return ParagraphStyle(name, fontName='Helvetica-Bold', fontSize=size, leading=leading, textColor=colors.black, alignment=1)
         
         # Calculate dynamic page height precisely to eliminate trailing white space
+        total_amt = float(bill.get('total_amount', 0.0) or 0.0)
+        net_amt = float(bill.get('net_amount', 0.0) or 0.0)
+        discount_amt = total_amt - net_amt
+        has_discount = discount_amt > 0
+        
         base_height = 295  # All fixed header/footer/divider/spacing elements + top/bottom margins
+        if has_discount:
+            base_height += 30
         per_item_height = 20
         log_section_height = (18 + len(logs) * 13) if logs else 0
         exact_height = base_height + (len(items) * per_item_height) + log_section_height
@@ -1494,16 +1525,37 @@ def generate_bill_thermal_pdf(bill_no):
                 Paragraph(f"{subtotal:.0f}", td_right)
             ])
         
+        # Grand Total rows (dynamic depending on whether discount is applied)
+        if has_discount:
+            discount_type = bill.get('discount_type', 'none')
+            discount_val = float(bill.get('discount_value', 0.0) or 0.0)
+            disc_label = f"DISCOUNT ({discount_val:.0f}%)" if discount_type == 'percent' else "DISCOUNT"
+            
+            items_data.append([
+                Paragraph("SUBTOTAL", ParagraphStyle('SUBTL', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)),
+                "", "",
+                Paragraph(f"Rs.{total_amt:.2f}", ParagraphStyle('SUBTV', fontName='Helvetica-Bold', fontSize=7.5, leading=10, alignment=2, textColor=colors.black)),
+                ""
+            ])
+            items_data.append([
+                Paragraph(disc_label, ParagraphStyle('DISCL', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)),
+                "", "",
+                Paragraph(f"-Rs.{discount_amt:.2f}", ParagraphStyle('DISCV', fontName='Helvetica-Bold', fontSize=7.5, leading=10, alignment=2, textColor=colors.black)),
+                ""
+            ])
+            
         # Grand Total row (span cols 0-2 for label, and cols 3-4 for value)
         items_data.append([
             Paragraph("<b>NET PAID</b>", ParagraphStyle('GTL', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)),
             "", "",
-            Paragraph(f"<b>Rs.{float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTV', fontName='Helvetica-Bold', fontSize=7.5, leading=10, alignment=2, textColor=colors.black)),
+            Paragraph(f"<b>Rs.{net_amt:.2f}</b>", ParagraphStyle('GTV', fontName='Helvetica-Bold', fontSize=7.5, leading=10, alignment=2, textColor=colors.black)),
             ""
         ])
         
         items_table = Table(items_data, colWidths=[70, 36, 24, 24, 28])
-        items_table.setStyle(TableStyle([
+        
+        # Build dynamic style table
+        t_style = [
             # Padding control to fit text on a single line
             ('LEFTPADDING', (0,0), (-1,-1), 2),
             ('RIGHTPADDING', (0,0), (-1,-1), 2),
@@ -1516,18 +1568,44 @@ def generate_bill_thermal_pdf(bill_no):
             
             # Data rows
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('TOPPADDING', (0,1), (-1,-2), 4),
-            ('BOTTOMPADDING', (0,1), (-1,-2), 4),
-            ('LINEBELOW', (0,1), (-1,-2), 0.3, colors.black),
+            ('TOPPADDING', (0,1), (-1, len(items)), 4),
+            ('BOTTOMPADDING', (0,1), (-1, len(items)), 4),
+            ('LINEBELOW', (0,1), (-1, len(items)), 0.3, colors.black),
+        ]
+        
+        num_items = len(items)
+        if has_discount:
+            # Span Subtotal
+            t_style.append(('SPAN', (0, num_items + 1), (2, num_items + 1)))
+            t_style.append(('SPAN', (3, num_items + 1), (4, num_items + 1)))
+            # Span Discount
+            t_style.append(('SPAN', (0, num_items + 2), (2, num_items + 2)))
+            t_style.append(('SPAN', (3, num_items + 2), (4, num_items + 2)))
+            # Span Net Paid
+            t_style.append(('SPAN', (0, num_items + 3), (2, num_items + 3)))
+            t_style.append(('SPAN', (3, num_items + 3), (4, num_items + 3)))
             
-            # Grand total row
-            ('SPAN', (0, -1), (2, -1)),
-            ('SPAN', (3, -1), (4, -1)),
-            ('LINEABOVE', (0, -1), (-1, -1), 0.8, colors.black),
-            ('LINEBELOW', (0, -1), (-1, -1), 1.5, colors.black),
-            ('TOPPADDING', (0, -1), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, -1), (-1, -1), 5),
-        ]))
+            # Lines and padding
+            t_style.append(('LINEABOVE', (0, num_items + 1), (-1, num_items + 1), 0.8, colors.black))
+            t_style.append(('LINEBELOW', (0, num_items + 3), (-1, num_items + 3), 1.5, colors.black))
+            t_style.append(('TOPPADDING', (0, num_items + 1), (-1, num_items + 1), 4))
+            t_style.append(('BOTTOMPADDING', (0, num_items + 1), (-1, num_items + 1), 2))
+            t_style.append(('TOPPADDING', (0, num_items + 2), (-1, num_items + 2), 2))
+            t_style.append(('BOTTOMPADDING', (0, num_items + 2), (-1, num_items + 2), 4))
+            t_style.append(('TOPPADDING', (0, num_items + 3), (-1, num_items + 3), 5))
+            t_style.append(('BOTTOMPADDING', (0, num_items + 3), (-1, num_items + 3), 5))
+        else:
+            # Span Net Paid
+            t_style.append(('SPAN', (0, num_items + 1), (2, num_items + 1)))
+            t_style.append(('SPAN', (3, num_items + 1), (4, num_items + 1)))
+            
+            # Lines and padding
+            t_style.append(('LINEABOVE', (0, num_items + 1), (-1, num_items + 1), 0.8, colors.black))
+            t_style.append(('LINEBELOW', (0, num_items + 1), (-1, num_items + 1), 1.5, colors.black))
+            t_style.append(('TOPPADDING', (0, num_items + 1), (-1, num_items + 1), 5))
+            t_style.append(('BOTTOMPADDING', (0, num_items + 1), (-1, num_items + 1), 5))
+            
+        items_table.setStyle(TableStyle(t_style))
         story.append(items_table)
         story.append(Spacer(1, 6))
         

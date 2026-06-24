@@ -2172,9 +2172,9 @@ function renderBillsList() {
             <td style="font-weight: 700;">${bill.bill_no}</td>
             <td>${bill.date}</td>
             <td>${bill.customer_email || '<span style="color:#aaa;">Walk-in</span>'}</td>
-            <td style="text-align: right; font-weight: 600;">$${parseFloat(bill.total_amount).toFixed(2)}</td>
-            <td style="text-align: right; color: var(--accent-red); font-weight: 600;">$${parseFloat(bill.discount_share || bill.discount_value || 0).toFixed(2)}</td>
-            <td style="text-align: right; font-weight: 700; color: var(--primary);">$${parseFloat(bill.net_amount).toFixed(2)}</td>
+            <td style="text-align: right; font-weight: 600;">₹${parseFloat(bill.total_amount).toFixed(2)}</td>
+            <td style="text-align: right; color: var(--accent-red); font-weight: 600;">₹${parseFloat(bill.discount_share || bill.discount_value || 0).toFixed(2)}</td>
+            <td style="text-align: right; font-weight: 700; color: var(--primary);">₹${parseFloat(bill.net_amount).toFixed(2)}</td>
             <td style="text-align: center;">${statusBadge}</td>
             <td style="text-align: center; display: flex; justify-content: center; gap: 0.4rem; align-items: center;">
                 <button class="btn btn-outline" style="padding: 0.25rem 0.4rem; font-size: 0.8rem;" onclick="openBillDetails('${bill.bill_no}')">Details</button>
@@ -2222,9 +2222,9 @@ async function openBillDetails(billNo) {
             discTotal += parseFloat(it.discount_share || 0) * parseInt(it.quantity);
         });
         
-        detailsBillTotal.textContent = `$${parseFloat(bill.total_amount).toFixed(2)}`;
-        detailsBillDiscount.textContent = `-$${parseFloat(discTotal || bill.discount_value || 0).toFixed(2)}`;
-        detailsBillNet.textContent = `$${parseFloat(bill.net_amount).toFixed(2)}`;
+        detailsBillTotal.textContent = `₹${parseFloat(bill.total_amount).toFixed(2)}`;
+        detailsBillDiscount.textContent = `-₹${parseFloat(discTotal || bill.discount_value || 0).toFixed(2)}`;
+        detailsBillNet.textContent = `₹${parseFloat(bill.net_amount).toFixed(2)}`;
         
         // Populate items body
         detailsItemsBody.innerHTML = '';
@@ -2248,7 +2248,7 @@ async function openBillDetails(billNo) {
             tr.innerHTML = `
                 <td style="padding: 0.75rem; font-weight: 600;">${item.product_name}</td>
                 <td style="padding: 0.75rem;"><code class="sku-mono">${item.sku}</code></td>
-                <td style="padding: 0.75rem; text-align: right;">$${parseFloat(item.final_sold_price).toFixed(2)}</td>
+                <td style="padding: 0.75rem; text-align: right;">₹${parseFloat(item.final_sold_price).toFixed(2)}</td>
                 <td style="padding: 0.75rem; text-align: center;">${purchased}</td>
                 <td style="padding: 0.75rem; text-align: center; font-weight: 600; color: ${returned > 0 ? 'var(--accent-red)' : '#888'};">${returned}</td>
                 <td style="padding: 0.75rem; text-align: center;">${actionBtn}</td>
@@ -2268,8 +2268,8 @@ async function openBillDetails(billNo) {
                 
                 const itemsStr = log.items_involved.map(it => `${it.action === 'refunded' ? 'Returned' : 'Issued'} ${it.quantity}x ${it.product_name} (${it.sku})`).join(', ');
                 const cashStr = parseFloat(log.cash_delta) < 0 
-                    ? `Refunded $${Math.abs(parseFloat(log.cash_delta)).toFixed(2)} cash` 
-                    : (parseFloat(log.cash_delta) > 0 ? `Charged additional $${parseFloat(log.cash_delta).toFixed(2)}` : 'No cash adjustment');
+                    ? `Refunded ₹${Math.abs(parseFloat(log.cash_delta)).toFixed(2)} cash` 
+                    : (parseFloat(log.cash_delta) > 0 ? `Charged additional ₹${parseFloat(log.cash_delta).toFixed(2)}` : 'No cash adjustment');
                     
                 div.innerHTML = `<strong>[${log.date}] ${log.type.toUpperCase()}:</strong> ${itemsStr}. <em>${cashStr}</em>`;
                 detailsLogsBody.appendChild(div);
@@ -2334,20 +2334,20 @@ function calculateExchangeDifference() {
     if (!exchProd) return;
     
     const exchPrice = parseFloat(exchProd.selling_price);
-    wizardExchangeUnitPrice.textContent = `$${exchPrice.toFixed(2)}`;
+    wizardExchangeUnitPrice.textContent = `₹${exchPrice.toFixed(2)}`;
     
     const valueReturned = parseFloat(activeWizardItem.final_sold_price) * retQty;
     const valueIssued = exchPrice * exchQty;
     const difference = valueIssued - valueReturned;
     
     if (difference > 0) {
-        wizardExchangeDifference.textContent = `Customer pays difference: +$${difference.toFixed(2)}`;
+        wizardExchangeDifference.textContent = `Customer pays difference: +₹${difference.toFixed(2)}`;
         wizardExchangeDifference.style.color = 'var(--accent-red)';
     } else if (difference < 0) {
-        wizardExchangeDifference.textContent = `Refund difference to customer: -$${Math.abs(difference).toFixed(2)}`;
+        wizardExchangeDifference.textContent = `Refund difference to customer: -₹${Math.abs(difference).toFixed(2)}`;
         wizardExchangeDifference.style.color = 'var(--success)';
     } else {
-        wizardExchangeDifference.textContent = `Even Swap: $0.00`;
+        wizardExchangeDifference.textContent = `Even Swap: ₹0.00`;
         wizardExchangeDifference.style.color = 'var(--text-primary)';
     }
 }
