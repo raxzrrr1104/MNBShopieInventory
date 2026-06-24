@@ -235,4 +235,28 @@ The local developer environment serves assets over **secure HTTPS mode** by gene
 * **Password**: `MNBShopie@123`
 
 ---
+
+## ☁️ Deploying to Vercel
+
+This repository is fully configured and ready for serverless hosting on **Vercel** out-of-the-box. 
+
+### 1. Vercel Configuration Details
+The repository contains a [`vercel.json`](./vercel.json) file that handles routing and builds your Python Flask serverless function via `@vercel/python`.
+
+### 2. Steps to Deploy
+1. Push your repository code to GitHub:
+   ```bash
+   git push origin main
+   ```
+2. Log in to the [Vercel Dashboard](https://vercel.com/) and click **Add New Project**.
+3. Select and import your GitHub repository (`MNBShopieInventory`).
+4. In the **Environment Variables** section, add the following credentials from your `.env` file:
+   * `SUPABASE_URL`
+   * `SUPABASE_KEY`
+   * `LOGIN_USER`
+   * `LOGIN_PASS`
+   * `FLASK_SECRET_KEY`
+5. Click **Deploy**. Vercel will install the requirements from [`requirements.txt`](./requirements.txt), compile the serverless function, and host your app live!
+
+---
 Developed by **Mohit Sherkhane**
