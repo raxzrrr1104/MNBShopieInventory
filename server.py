@@ -1067,6 +1067,39 @@ import io
 from email.mime.base import MIMEBase
 from email import encoders
 
+def format_date_to_ist(date_val):
+    if not date_val:
+        return ""
+    import datetime
+    try:
+        if isinstance(date_val, datetime.datetime):
+            dt = date_val
+        else:
+            clean_val = str(date_val).strip()
+            if clean_val.endswith('Z'):
+                clean_val = clean_val[:-1] + '+00:00'
+            dt = None
+            try:
+                dt = datetime.datetime.fromisoformat(clean_val)
+            except ValueError:
+                for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%Y-%m-%d %I:%M %p"):
+                    try:
+                        dt = datetime.datetime.strptime(clean_val, fmt)
+                        break
+                    except ValueError:
+                        continue
+        if not dt:
+            return str(date_val)
+        if dt.tzinfo is not None:
+            ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+            dt = dt.astimezone(ist_tz)
+        else:
+            dt = dt + datetime.timedelta(hours=5, minutes=30)
+        return dt.strftime("%Y-%m-%d %I:%M %p")
+    except Exception as e:
+        logging.error(f"Error converting date to IST: {e}")
+        return str(date_val)
+
 def generate_bill_pdf(bill_no):
     if not SUPABASE_URL or not SUPABASE_KEY:
         return None
@@ -1153,7 +1186,7 @@ def generate_bill_pdf(bill_no):
                 [
                     Paragraph(f"<b>INVOICE {bill_no}</b>", ParagraphStyle('InvoiceTitle', fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor('#4f46e5'), alignment=2)),
                     Spacer(1, 4),
-                    Paragraph(f"Date: {bill['date']}", ParagraphStyle('InvoiceDate', fontName='Helvetica', fontSize=9, leading=13, textColor=colors.HexColor('#64748b'), alignment=2))
+                    Paragraph(f"Date: {format_date_to_ist(bill['date'])}", ParagraphStyle('InvoiceDate', fontName='Helvetica', fontSize=9, leading=13, textColor=colors.HexColor('#64748b'), alignment=2))
                 ]
             ]
         ]
@@ -1386,7 +1419,7 @@ def generate_bill_thermal_pdf(bill_no):
         story.append(Paragraph("<b>INVOICE&nbsp;&nbsp;&nbsp;&nbsp;RECEIPT</b>", cbold('IT', 9, 12)))
         story.append(Spacer(1, 3))
         story.append(Paragraph(f"<b>No: {bill_no}</b>", cbold('INO', 7.5, 10)))
-        story.append(Paragraph(f"Date: {bill['date']}", cbold('IDT', 7, 10)))
+        story.append(Paragraph(f"Date: {format_date_to_ist(bill['date'])}", cbold('IDT', 7, 10)))
         story.append(Spacer(1, 5))
         story.append(make_line(0.8))
         story.append(Spacer(1, 5))
@@ -1441,7 +1474,7 @@ def generate_bill_thermal_pdf(bill_no):
             Paragraph("TOTAL", th_right)
         ]]
         
-        td_style = ParagraphStyle('TD', fontName='Helvetica-Bold', fontSize=7, leading=9, textColor=colors.black)
+        td_style = ParagraphStyle('TD', fontName='Helvetica-Bold', fontSize=8.5, leading=10.5, textColor=colors.black)
         td_right = ParagraphStyle('TDR', parent=td_style, alignment=2)
         td_center = ParagraphStyle('TDC', parent=td_style, alignment=1)
         
@@ -1508,7 +1541,7 @@ def generate_bill_thermal_pdf(bill_no):
                 log_items_str = ", ".join([f"{it['action'].upper()}: {it['quantity']}x {it['product_name']}" for it in log.get('items_involved', [])])
                 cash_str = f"Delta: Rs. {float(log.get('cash_delta', 0.0)):.2f}"
                 log_p_style = ParagraphStyle('LP', fontName='Helvetica-Bold', fontSize=6.5, leading=9, textColor=colors.black)
-                story.append(Paragraph(f"[{log['date']}] {log['type'].upper()}: {log_items_str} ({cash_str})", log_p_style))
+                story.append(Paragraph(f"[{format_date_to_ist(log['date'])}] {log['type'].upper()}: {log_items_str} ({cash_str})", log_p_style))
                 story.append(Spacer(1, 2))
             story.append(Spacer(1, 4))
         
