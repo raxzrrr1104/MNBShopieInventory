@@ -1410,12 +1410,33 @@ def generate_bill_thermal_pdf(bill_no):
         discount_amt = total_amt - net_amt
         has_discount = discount_amt > 0
         
-        base_height = 295  # All fixed header/footer/divider/spacing elements + top/bottom margins
+        # 1. Fixed height for header section (~174pt)
+        header_section_height = 174
+        
+        # 2. Items table height: Header row (17pt) + each item row based on name text wrapping
+        import math
+        items_table_height = 17
+        for item in items:
+            name = item.get('product_name', 'Product')
+            # approx 13 characters per line for 70pt column width in Helvetica-Bold 8.5
+            lines = max(1, math.ceil(len(name) / 13))
+            items_table_height += (lines * 10.5) + 8  # 10.5 leading + 8 padding (4 top, 4 bottom)
+            
+        # 3. Totals height inside table
+        totals_height = 20  # NET PAID row
         if has_discount:
-            base_height += 30
-        per_item_height = 20
+            totals_height += 30  # SUBTOTAL + DISCOUNT rows
+            
+        # 4. Logs section height
         log_section_height = (18 + len(logs) * 13) if logs else 0
-        exact_height = base_height + (len(items) * per_item_height) + log_section_height
+        
+        # 5. Footer section height (~59pt)
+        footer_section_height = 59
+        
+        # 6. Safety padding to account for small font rendering differences
+        safety_padding = 25
+        
+        exact_height = header_section_height + items_table_height + totals_height + log_section_height + footer_section_height + safety_padding
         pagesize = (page_width, exact_height)
         
         buffer = io.BytesIO()
