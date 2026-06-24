@@ -1325,100 +1325,61 @@ def generate_bill_thermal_pdf(bill_no):
         
         page_width = 226
         
-        # Base height estimate: margins, stacked header elements, status block, greeting footer, spacers.
-        base_height = 200
-        # Items table height estimate: header row, actual items.
-        item_height = 20 + (len(items) * 22) + 25
-        # Logs height estimate.
-        log_height = (25 + (len(logs) * 25)) if logs else 0
+        # Calculate height dynamically based on contents to eliminate trailing white space
+        header_height = 120
+        billing_height = 30
+        items_height = 20 + (len(items) * 26) + 20
+        log_height = (20 + (len(logs) * 20)) if logs else 0
+        footer_height = 35
         
-        # Set a very safe, generous page height limit to prevent page-breaks on roll printers.
-        # Extra spacing is ignored by roll thermal cutting drivers.
-        calculated_height = max(420, base_height + item_height + log_height)
-        pagesize = (page_width, calculated_height)
+        # Add page margins (10 top, 10 bottom) + small buffer
+        exact_height = 20 + header_height + billing_height + items_height + log_height + footer_height + 10
+        pagesize = (page_width, exact_height)
         
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=pagesize, rightMargin=10, leftMargin=10, topMargin=10, bottomMargin=10)
+        doc = SimpleDocTemplate(buffer, pagesize=pagesize, rightMargin=12, leftMargin=12, topMargin=12, bottomMargin=12)
         story = []
         styles = getSampleStyleSheet()
         
-        title_style = ParagraphStyle(
-            'DocTitle',
+        # Force all texts to be bold (Helvetica-Bold) and solid black (#000000) for thermal print density
+        body_bold = ParagraphStyle(
+            'DocBodyBold',
             fontName='Helvetica-Bold',
-            fontSize=11,
-            leading=14,
-            textColor=colors.HexColor('#000000'),
-            alignment=1
-        )
-        
-        subtitle_style = ParagraphStyle(
-            'DocSubTitle',
-            fontName='Helvetica',
             fontSize=8,
             leading=11,
-            textColor=colors.HexColor('#475569'),
-            spaceAfter=8,
-            alignment=1
+            textColor=colors.black
         )
         
         body_style = ParagraphStyle(
             'DocBody',
-            fontName='Helvetica',
-            fontSize=8,
-            leading=11,
-            textColor=colors.HexColor('#334155')
+            parent=body_bold
         )
-        
-        body_bold = ParagraphStyle(
-            'DocBodyBold',
-            parent=body_style,
-            fontName='Helvetica-Bold'
-        )
-        
-        # Try to load brand logo Image
-        brand_logo = None
-        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'image.png')
-        if os.path.exists(logo_path):
-            try:
-                from reportlab.platypus import Image as RLImage
-                brand_logo = RLImage(logo_path, width=80, height=25)
-                brand_logo.hAlign = 'CENTER'
-            except Exception as logo_err:
-                logging.error(f"Error loading brand logo for PDF: {logo_err}")
  
-        # Stacked Header Section
-        if brand_logo:
-            story.append(brand_logo)
-            story.append(Spacer(1, 4))
-        story.append(Paragraph("<b>M N B   S H O P I E</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor('#000000'), alignment=1)))
-        story.append(Paragraph("C U R A T E D   I M P O R T E D   L U X U R Y", ParagraphStyle('BrandSub', fontName='Helvetica-Bold', fontSize=6.5, leading=9, textColor=colors.HexColor('#475569'), alignment=1)))
+        # Stacked Header Section (No image logo to prevent blackout box)
+        story.append(Paragraph("<b>M N B   S H O P I E</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.black, alignment=1)))
+        story.append(Paragraph("C U R A T E D   I M P O R T E D   L U X U R Y", ParagraphStyle('BrandSub', fontName='Helvetica-Bold', fontSize=6.5, leading=9, textColor=colors.black, alignment=1)))
+        story.append(Paragraph("GSTIN: 29AEUPS8210E1Z1", ParagraphStyle('GSTText', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black, alignment=1)))
         story.append(Spacer(1, 2))
-        story.append(Paragraph("A ONE STOP SHOP FOR YOUR NEEDS", ParagraphStyle('BrandTagline', fontName='Helvetica-Oblique', fontSize=6, leading=8, textColor=colors.HexColor('#64748b'), alignment=1)))
-        story.append(Spacer(1, 6))
+        story.append(Paragraph("A ONE STOP SHOP FOR YOUR NEEDS", ParagraphStyle('BrandTagline', fontName='Helvetica-Bold', fontSize=6, leading=8, textColor=colors.black, alignment=1)))
+        story.append(Spacer(1, 4))
         
-        story.append(Paragraph("<b>I N V O I C E   R E C E I P T</b>", ParagraphStyle('InvoiceTitle', fontName='Helvetica-Bold', fontSize=8, leading=11, textColor=colors.HexColor('#000000'), alignment=1)))
-        story.append(Paragraph(f"<b>No: {bill_no}</b>", ParagraphStyle('InvoiceNo', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#000000'), alignment=1)))
-        story.append(Paragraph(f"Date: {bill['date']}", ParagraphStyle('InvoiceDate', fontName='Helvetica', fontSize=7, leading=10, textColor=colors.HexColor('#475569'), alignment=1)))
+        story.append(Paragraph("<b>I N V O I C E   R E C E I P T</b>", ParagraphStyle('InvoiceTitle', fontName='Helvetica-Bold', fontSize=8, leading=11, textColor=colors.black, alignment=1)))
+        story.append(Paragraph(f"<b>No: {bill_no}</b>", ParagraphStyle('InvoiceNo', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black, alignment=1)))
+        story.append(Paragraph(f"Date: {bill['date']}", ParagraphStyle('InvoiceDate', fontName='Helvetica-Bold', fontSize=7, leading=10, textColor=colors.black, alignment=1)))
         story.append(Spacer(1, 4))
         
         # Elegant double divider line
         line_table = Table([[""], [""]], colWidths=[206], rowHeights=[1, 1])
         line_table.setStyle(TableStyle([
-            ('LINEBELOW', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
+            ('LINEBELOW', (0,0), (-1,-1), 0.5, colors.black),
             ('PADDING', (0,0), (-1,-1), 0),
             ('BOTTOMPADDING', (0,0), (-1,-1), 0),
             ('TOPPADDING', (0,0), (-1,-1), 0),
         ]))
         story.append(line_table)
-        story.append(Spacer(1, 6))
+        story.append(Spacer(1, 4))
         
         # Billing Metadata Table
-        status_colors = {
-            'completed': '#000000',
-            'partially_refunded': '#4b5563',
-            'exchanged': '#111827',
-            'refunded': '#991b1b'
-        }
         status_labels = {
             'completed': 'PAID / COMPLETED',
             'partially_refunded': 'PARTIALLY RETURNED',
@@ -1426,12 +1387,11 @@ def generate_bill_thermal_pdf(bill_no):
             'refunded': 'FULLY REFUNDED'
         }
         bill_status = bill.get('status', 'completed')
-        status_color = status_colors.get(bill_status, '#000000')
         status_label = status_labels.get(bill_status, bill_status.upper())
         
         billing_data = [
             [Paragraph("<b>CUSTOMER:</b>", body_bold), Paragraph((bill['customer_email'] if bill['customer_email'] else "Walk-in Customer").upper(), body_style)],
-            [Paragraph("<b>STATUS:</b>", body_bold), Paragraph(status_label, ParagraphStyle('InvoiceStatus', parent=body_style, textColor=colors.HexColor(status_color), fontName='Helvetica-Bold'))]
+            [Paragraph("<b>STATUS:</b>", body_bold), Paragraph(status_label, ParagraphStyle('InvoiceStatus', parent=body_style, textColor=colors.black, fontName='Helvetica-Bold'))]
         ]
         billing_table = Table(billing_data, colWidths=[65, 141])
         billing_table.setStyle(TableStyle([
@@ -1440,10 +1400,10 @@ def generate_bill_thermal_pdf(bill_no):
             ('LEFTPADDING', (0,0), (-1,-1), 0),
         ]))
         story.append(billing_table)
-        story.append(Spacer(1, 8))
+        story.append(Spacer(1, 6))
         
         # Items Table Headers
-        th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#000000'))
+        th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)
         th_right = ParagraphStyle('THRight', parent=th_style, alignment=2)
         th_center = ParagraphStyle('THCenter', parent=th_style, alignment=1)
         
@@ -1456,7 +1416,7 @@ def generate_bill_thermal_pdf(bill_no):
         ]]
         
         # Populate items
-        td_style = ParagraphStyle('TD', fontName='Helvetica', fontSize=7.5, leading=10, textColor=colors.HexColor('#0f172a'))
+        td_style = ParagraphStyle('TD', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)
         td_right = ParagraphStyle('TDRight', parent=td_style, alignment=2)
         td_center = ParagraphStyle('TDCenter', parent=td_style, alignment=1)
         
@@ -1478,58 +1438,66 @@ def generate_bill_thermal_pdf(bill_no):
             
         # Grand Total row (merged columns 0 to 3 to prevent vertical string wrapping)
         items_data.append([
-            Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=0, textColor=colors.HexColor('#000000'))),
+            Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=0, textColor=colors.black)),
             "", "", "",
-            Paragraph(f"<b>Rs. {float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.HexColor('#000000')))
+            Paragraph(f"<b>Rs. {float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.black))
         ])
         
         items_table = Table(items_data, colWidths=[90, 42, 17, 17, 40])
         items_table.setStyle(TableStyle([
-            ('LINEABOVE', (0,0), (-1,0), 0.5, colors.HexColor('#000000')),
-            ('LINEBELOW', (0,0), (-1,0), 0.5, colors.HexColor('#000000')),
+            ('LINEABOVE', (0,0), (-1,0), 0.5, colors.black),
+            ('LINEBELOW', (0,0), (-1,0), 0.5, colors.black),
             ('TOPPADDING', (0,0), (-1,0), 4),
             ('BOTTOMPADDING', (0,0), (-1,0), 4),
             
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('TOPPADDING', (0,1), (-1,-2), 4),
             ('BOTTOMPADDING', (0,1), (-1,-2), 4),
-            ('LINEBELOW', (0,1), (-1,-2), 0.3, colors.HexColor('#cbd5e1')),
+            ('LINEBELOW', (0,1), (-1,-2), 0.3, colors.black),
             
             ('SPAN', (0, -1), (3, -1)),
-            ('LINEABOVE', (0, -1), (-1, -1), 0.5, colors.HexColor('#000000')),
-            ('LINEBELOW', (0, -1), (-1, -1), 1.2, colors.HexColor('#000000')),
+            ('LINEABOVE', (0, -1), (-1, -1), 0.5, colors.black),
+            ('LINEBELOW', (0, -1), (-1, -1), 1.2, colors.black),
             ('TOPPADDING', (0, -1), (-1, -1), 5),
             ('BOTTOMPADDING', (0, -1), (-1, -1), 5),
         ]))
         story.append(items_table)
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 8))
         
         # Activity Logs Section
         if logs:
-            story.append(Paragraph("<b>RETURN & EXCHANGE HISTORIC LOG</b>", ParagraphStyle('LogTitle', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#000000'))))
+            story.append(Paragraph("<b>RETURN & EXCHANGE HISTORIC LOG</b>", ParagraphStyle('LogTitle', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)))
             story.append(Spacer(1, 3))
             for log in logs:
                 log_items_str = ", ".join([f"{it['action'].upper()}: {it['quantity']}x {it['product_name']}" for it in log.get('items_involved', [])])
                 cash_str = f"Delta: Rs. {float(log.get('cash_delta', 0.0)):.2f}"
-                log_p_style = ParagraphStyle('LogP', fontName='Helvetica', fontSize=7, leading=10, textColor=colors.HexColor('#475569'))
+                log_p_style = ParagraphStyle('LogP', fontName='Helvetica-Bold', fontSize=7, leading=10, textColor=colors.black)
                 story.append(Paragraph(f"• <b>[{log['date']}] {log['type'].upper()}:</b> {log_items_str} ({cash_str})", log_p_style))
                 story.append(Spacer(1, 2))
-            story.append(Spacer(1, 10))
+            story.append(Spacer(1, 8))
             
         # Greeting
         footer_style = ParagraphStyle(
             'DocFooter',
-            fontName='Helvetica-Oblique',
+            fontName='Helvetica-Bold',
             fontSize=7,
             leading=10,
-            textColor=colors.HexColor('#475569'),
+            textColor=colors.black,
             alignment=1
         )
         story.append(Paragraph("EXCLUSIVE CURATED GOODS FOR THE DISCERNING", footer_style))
         story.append(Spacer(1, 2))
-        story.append(Paragraph("Thank you for shopping at MNB Shopie. We appreciate your business.", ParagraphStyle('DocFooterSub', fontName='Helvetica', fontSize=6, leading=9, textColor=colors.HexColor('#64748b'), alignment=1)))
+        story.append(Paragraph("Thank you for shopping at MNB Shopie. We appreciate your business.", ParagraphStyle('DocFooterSub', fontName='Helvetica-Bold', fontSize=6, leading=9, textColor=colors.black, alignment=1)))
         
-        doc.build(story)
+        # Draw solid black border around the page corners
+        def draw_border(canvas, doc):
+            canvas.saveState()
+            canvas.setStrokeColor(colors.black)
+            canvas.setLineWidth(1.5)
+            canvas.rect(4, 4, page_width - 8, exact_height - 8)
+            canvas.restoreState()
+            
+        doc.build(story, onFirstPage=draw_border)
         pdf_bytes = buffer.getvalue()
         buffer.close()
         return pdf_bytes
