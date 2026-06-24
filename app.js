@@ -2135,9 +2135,10 @@ function renderBillsList() {
             <td style="text-align: right; color: var(--accent-red); font-weight: 600;">$${parseFloat(bill.discount_share || bill.discount_value || 0).toFixed(2)}</td>
             <td style="text-align: right; font-weight: 700; color: var(--primary);">$${parseFloat(bill.net_amount).toFixed(2)}</td>
             <td style="text-align: center;">${statusBadge}</td>
-            <td style="text-align: center; display: flex; justify-content: center; gap: 0.5rem; align-items: center;">
-                <button class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="openBillDetails('${bill.bill_no}')">Details</button>
-                <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="downloadBillPDF('${bill.bill_no}')">PDF</button>
+            <td style="text-align: center; display: flex; justify-content: center; gap: 0.4rem; align-items: center;">
+                <button class="btn btn-outline" style="padding: 0.25rem 0.4rem; font-size: 0.8rem;" onclick="openBillDetails('${bill.bill_no}')">Details</button>
+                <button class="btn btn-primary" style="padding: 0.25rem 0.4rem; font-size: 0.8rem;" onclick="downloadBillPDF('${bill.bill_no}')">PDF</button>
+                <button class="btn btn-success" style="padding: 0.25rem 0.4rem; font-size: 0.8rem; background: var(--success); border-color: var(--success); color: white;" onclick="printBillDirect('${bill.bill_no}')">Print</button>
             </td>
         `;
         billsTableBody.appendChild(tr);
@@ -2487,4 +2488,54 @@ async function downloadBillPDF(billNo) {
     }
 }
 
+async function printBillDirect(billNo) {
+    try {
+        showToast('Loading print document...', 'info');
+        const res = await fetch(`${BASE_URL}/api/billing/pdf/${billNo}`);
+        if (!res.ok) {
+            showToast('Failed to load PDF for printing', 'error');
+            return;
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        
+        let iframe = document.getElementById('pdfPrintIframe');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'pdfPrintIframe';
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = 'none';
+            document.body.appendChild(iframe);
+        }
+        iframe.src = url;
+        iframe.onload = function() {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (err) {
+                console.error('Error printing PDF via iframe:', err);
+                showToast('Failed to trigger print dialog', 'error');
+            }
+        };
+    } catch (err) {
+        console.error('Error printing PDF:', err);
+        showToast('Network error preparing print', 'error');
+    }
+}
+
+function printBillFromModal() {
+    const billNo = detailsBillNo.textContent.trim();
+    if (billNo && billNo !== '—') {
+        printBillDirect(billNo);
+    } else {
+        showToast('No active bill selected', 'error');
+    }
+}
+
 window.downloadBillPDF = downloadBillPDF;
+window.printBillDirect = printBillDirect;
+window.printBillFromModal = printBillFromModal;

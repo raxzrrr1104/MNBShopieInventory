@@ -1158,34 +1158,38 @@ def generate_bill_pdf(bill_no):
             except Exception as logo_err:
                 logging.error(f"Error loading brand logo for PDF: {logo_err}")
  
-        # Stacked Header Section (optimized for narrow thermal paper)
+        # Stacked Header Section (optimized for narrow thermal paper with luxury styling)
         if brand_logo:
             story.append(brand_logo)
             story.append(Spacer(1, 4))
-        story.append(Paragraph("<b>MNB Shopie — Curated Imported Luxury</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=9, leading=12, textColor=colors.HexColor('#1e293b'), alignment=1)))
-        story.append(Paragraph("A one stop shop, for all your needs!", subtitle_style))
+        story.append(Paragraph("<b>M N B   S H O P I E</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor('#000000'), alignment=1)))
+        story.append(Paragraph("C U R A T E D   I M P O R T E D   L U X U R Y", ParagraphStyle('BrandSub', fontName='Helvetica-Bold', fontSize=6.5, leading=9, textColor=colors.HexColor('#475569'), alignment=1)))
+        story.append(Spacer(1, 3))
+        story.append(Paragraph("A ONE STOP SHOP FOR YOUR NEEDS", ParagraphStyle('BrandTagline', fontName='Helvetica-Oblique', fontSize=6, leading=8, textColor=colors.HexColor('#64748b'), alignment=1)))
+        story.append(Spacer(1, 6))
         
-        story.append(Paragraph(f"<b>INVOICE {bill_no}</b>", ParagraphStyle('InvoiceTitle', fontName='Helvetica-Bold', fontSize=10, leading=14, textColor=colors.HexColor('#4f46e5'), alignment=1)))
-        story.append(Paragraph(f"Date: {bill['date']}", ParagraphStyle('InvoiceDate', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#64748b'), alignment=1)))
-        story.append(Spacer(1, 5))
+        story.append(Paragraph("<b>I N V O I C E   R E C E I P T</b>", ParagraphStyle('InvoiceTitle', fontName='Helvetica-Bold', fontSize=8, leading=11, textColor=colors.HexColor('#000000'), alignment=1)))
+        story.append(Paragraph(f"<b>No: {bill_no}</b>", ParagraphStyle('InvoiceNo', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#000000'), alignment=1)))
+        story.append(Paragraph(f"Date: {bill['date']}", ParagraphStyle('InvoiceDate', fontName='Helvetica', fontSize=7, leading=10, textColor=colors.HexColor('#475569'), alignment=1)))
+        story.append(Spacer(1, 4))
         
-        # Decorative colored line (width 206)
-        line_table = Table([[""]], colWidths=[206])
+        # Elegant double divider line (width 206)
+        line_table = Table([[""], [""]], colWidths=[206], rowHeights=[1, 1])
         line_table.setStyle(TableStyle([
-            ('LINEBELOW', (0,0), (-1,-1), 1.5, colors.HexColor('#4f46e5')),
+            ('LINEBELOW', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
             ('PADDING', (0,0), (-1,-1), 0),
             ('BOTTOMPADDING', (0,0), (-1,-1), 0),
             ('TOPPADDING', (0,0), (-1,-1), 0),
         ]))
         story.append(line_table)
-        story.append(Spacer(1, 8))
+        story.append(Spacer(1, 6))
         
         # Billing Metadata Table
         status_colors = {
-            'completed': '#059669',
-            'partially_refunded': '#d97706',
-            'exchanged': '#4f46e5',
-            'refunded': '#dc2626'
+            'completed': '#000000',
+            'partially_refunded': '#4b5563',
+            'exchanged': '#111827',
+            'refunded': '#991b1b'
         }
         status_labels = {
             'completed': 'PAID / COMPLETED',
@@ -1194,29 +1198,29 @@ def generate_bill_pdf(bill_no):
             'refunded': 'FULLY REFUNDED'
         }
         bill_status = bill.get('status', 'completed')
-        status_color = status_colors.get(bill_status, '#059669')
+        status_color = status_colors.get(bill_status, '#000000')
         status_label = status_labels.get(bill_status, bill_status.upper())
         
         billing_data = [
-            [Paragraph("<b>Billed To:</b>", body_bold), Paragraph(bill['customer_email'] if bill['customer_email'] else "Walk-in Customer", body_style)],
-            [Paragraph("<b>Status:</b>", body_bold), Paragraph(status_label, ParagraphStyle('InvoiceStatus', parent=body_style, textColor=colors.HexColor(status_color), fontName='Helvetica-Bold'))]
+            [Paragraph("<b>CUSTOMER:</b>", body_bold), Paragraph((bill['customer_email'] if bill['customer_email'] else "Walk-in Customer").upper(), body_style)],
+            [Paragraph("<b>STATUS:</b>", body_bold), Paragraph(status_label, ParagraphStyle('InvoiceStatus', parent=body_style, textColor=colors.HexColor(status_color), fontName='Helvetica-Bold'))]
         ]
-        billing_table = Table(billing_data, colWidths=[50, 156])
+        billing_table = Table(billing_data, colWidths=[65, 141])
         billing_table.setStyle(TableStyle([
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
             ('PADDING', (0,0), (-1,-1), 1),
             ('LEFTPADDING', (0,0), (-1,-1), 0),
         ]))
         story.append(billing_table)
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 8))
         
         # Items Table Headers
-        th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#475569'))
+        th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#000000'))
         th_right = ParagraphStyle('THRight', parent=th_style, alignment=2)
         th_center = ParagraphStyle('THCenter', parent=th_style, alignment=1)
         
         items_data = [[
-            Paragraph("Item", th_style),
+            Paragraph("Item Description", th_style),
             Paragraph("Price", th_right),
             Paragraph("Qty", th_center),
             Paragraph("Ret", th_center),
@@ -1250,32 +1254,33 @@ def generate_bill_pdf(bill_no):
         # Grand Total row
         items_data.append([
             "", "", "",
-            Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.HexColor('#0f172a'))),
-            Paragraph(f"<b>Rs. {float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.HexColor('#4f46e5')))
+            Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.HexColor('#000000'))),
+            Paragraph(f"<b>Rs. {float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.HexColor('#000000')))
         ])
         
         items_table = Table(items_data, colWidths=[90, 42, 17, 17, 40])
         items_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f8fafc')),
+            ('LINEABOVE', (0,0), (-1,0), 0.5, colors.HexColor('#000000')),
+            ('LINEBELOW', (0,0), (-1,0), 0.5, colors.HexColor('#000000')),
             ('TOPPADDING', (0,0), (-1,0), 4),
             ('BOTTOMPADDING', (0,0), (-1,0), 4),
-            ('LINEBELOW', (0,0), (-1,0), 1, colors.HexColor('#e2e8f0')),
             
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('TOPPADDING', (0,1), (-1,-3), 4),
             ('BOTTOMPADDING', (0,1), (-1,-3), 4),
-            ('LINEBELOW', (0,1), (-1,-3), 0.5, colors.HexColor('#f1f5f9')),
+            ('LINEBELOW', (0,1), (-1,-3), 0.3, colors.HexColor('#cbd5e1')),
             
-            ('LINEABOVE', (3,-1), (4,-1), 1.2, colors.HexColor('#cbd5e1')),
-            ('TOPPADDING', (3,-1), (4,-1), 6),
-            ('BOTTOMPADDING', (3,-1), (4,-1), 6),
+            ('LINEABOVE', (3,-1), (4,-1), 0.5, colors.HexColor('#000000')),
+            ('LINEBELOW', (3,-1), (4,-1), 1.2, colors.HexColor('#000000')),
+            ('TOPPADDING', (3,-1), (4,-1), 5),
+            ('BOTTOMPADDING', (3,-1), (4,-1), 5),
         ]))
         story.append(items_table)
         story.append(Spacer(1, 10))
         
         # Activity Logs Section in PDF
         if logs:
-            story.append(Paragraph("<b>Return & Exchange Logs</b>", ParagraphStyle('LogTitle', fontName='Helvetica-Bold', fontSize=8, leading=11, textColor=colors.HexColor('#1e293b'))))
+            story.append(Paragraph("<b>RETURN & EXCHANGE HISTORIC LOG</b>", ParagraphStyle('LogTitle', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#000000'))))
             story.append(Spacer(1, 3))
             for log in logs:
                 log_items_str = ", ".join([f"{it['action'].upper()}: {it['quantity']}x {it['product_name']}" for it in log.get('items_involved', [])])
@@ -1291,10 +1296,12 @@ def generate_bill_pdf(bill_no):
             fontName='Helvetica-Oblique',
             fontSize=7,
             leading=10,
-            textColor=colors.HexColor('#94a3b8'),
+            textColor=colors.HexColor('#475569'),
             alignment=1
         )
-        story.append(Paragraph("Thank you for choosing MNB Shopie. We appreciate your business!", footer_style))
+        story.append(Paragraph("EXCLUSIVE CURATED GOODS FOR THE DISCERNING", footer_style))
+        story.append(Spacer(1, 2))
+        story.append(Paragraph("Thank you for shopping at MNB Shopie. We appreciate your business.", ParagraphStyle('DocFooterSub', fontName='Helvetica', fontSize=6, leading=9, textColor=colors.HexColor('#64748b'), alignment=1)))
         
         doc.build(story)
         pdf_bytes = buffer.getvalue()

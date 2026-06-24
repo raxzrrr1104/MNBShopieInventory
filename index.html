@@ -742,7 +742,11 @@
                 </div>
             </div>
             
-            <div class="modal-actions" style="margin-top: 1.5rem;">
+            <div class="modal-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button class="btn btn-outline" id="btnPrintBillDetails" onclick="printBillFromModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 4px; vertical-align: middle;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    Print Receipt
+                </button>
                 <button class="btn btn-primary" id="btnDismissBillDetails">Close</button>
             </div>
         </div>
