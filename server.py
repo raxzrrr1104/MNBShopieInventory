@@ -169,7 +169,7 @@ def fetch_image_by_name(name):
     # 1. Try Bing Images search as primary high-reliability fallback
     try:
         logging.info(f"Searching Bing Images first for name: {name}")
-        query = urllib.parse.quote(name)
+        query = urllib.parse.quote(name + " product")
         url = f"https://www.bing.com/images/search?q={query}"
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
@@ -287,7 +287,7 @@ def fetch_images_by_name(name):
     
     # 1. Bing Images (Primary High-Fidelity Product Images)
     try:
-        query = urllib.parse.quote(name)
+        query = urllib.parse.quote(name + " product")
         url = f"https://www.bing.com/images/search?q={query}"
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
