@@ -860,26 +860,34 @@ function updateStats() {
             totals[cat] = (totals[cat] || 0) + (item.quantity || 0);
         });
 
-        // Add entries for any categories that have zero stock
-        if (typeof categories !== 'undefined') {
-            categories.forEach(cat => {
-                if (!totals[cat]) {
-                    totals[cat] = 0;
-                }
-            });
-        }
-
-        // Render each category's total units
+        // Render each active category's total units (only show categories with stock > 0)
         const sortedCats = Object.keys(totals).sort();
+        let renderedCount = 0;
+        
         sortedCats.forEach(cat => {
+            const qty = totals[cat];
+            if (qty <= 0) return; // Skip categories with zero units to keep card clean
+            
+            renderedCount++;
             const row = document.createElement('div');
             row.style.display = 'flex';
             row.style.justifyContent = 'space-between';
             row.style.alignItems = 'center';
-            row.style.gap = '0.75rem';
-            row.innerHTML = `<span style="font-weight: 500;">${cat}</span><span style="font-weight: 700; color: var(--success);">${totals[cat]}</span>`;
+            row.style.padding = '0.25rem 0.5rem';
+            row.style.background = 'var(--primary-light)';
+            row.style.borderRadius = 'var(--radius-sm)';
+            row.style.fontSize = '0.72rem';
+            row.style.fontWeight = '600';
+            row.style.color = 'var(--primary)';
+            row.style.border = '1px solid rgba(79, 70, 229, 0.1)';
+            row.innerHTML = `<span>${cat}</span><span style="background: var(--bg-card); color: var(--text-primary); padding: 0.05rem 0.35rem; border-radius: 4px; font-weight: 800; font-size: 0.7rem; border: 1px solid var(--border-light);">${qty}</span>`;
             breakdownContainer.appendChild(row);
         });
+        
+        // Show a placeholder if all categories are empty
+        if (renderedCount === 0) {
+            breakdownContainer.innerHTML = '<div style="font-size: 0.72rem; color: var(--text-tertiary); text-align: center; font-style: italic;">No stock in any category</div>';
+        }
     }
 }
 
