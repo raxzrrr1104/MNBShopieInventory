@@ -1324,101 +1324,126 @@ def generate_bill_thermal_pdf(bill_no):
         from reportlab.lib import colors
         
         page_width = 226
+        side_margin = 22  # Generous margins to accommodate faulty left/right edge printing
+        printable_width = page_width - (side_margin * 2)  # 182pt usable width
         
-        # Calculate height dynamically based on contents to eliminate trailing white space
-        header_height = 120
-        billing_height = 30
-        items_height = 20 + (len(items) * 26) + 20
-        log_height = (20 + (len(logs) * 20)) if logs else 0
-        footer_height = 35
+        # Helper: create a horizontal line separator
+        def make_line(thickness=0.5):
+            t = Table([[""]], colWidths=[printable_width])
+            t.setStyle(TableStyle([
+                ('LINEBELOW', (0,0), (-1,-1), thickness, colors.black),
+                ('PADDING', (0,0), (-1,-1), 0),
+                ('TOPPADDING', (0,0), (-1,-1), 0),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+            ]))
+            return t
         
-        # Add page margins (10 top, 10 bottom) + small buffer
-        exact_height = 20 + header_height + billing_height + items_height + log_height + footer_height + 10
+        # Helper: decorative dashed separator for premium look
+        def make_deco():
+            s = ParagraphStyle('Deco', fontName='Helvetica-Bold', fontSize=6, leading=8, textColor=colors.black, alignment=1)
+            return Paragraph("- - - - - - - - - - - - - - - - -", s)
+        
+        # Helper: centered bold paragraph style
+        def cbold(name, size, leading):
+            return ParagraphStyle(name, fontName='Helvetica-Bold', fontSize=size, leading=leading, textColor=colors.black, alignment=1)
+        
+        # Calculate dynamic page height precisely to eliminate trailing white space
+        base_height = 295  # All fixed header/footer/divider/spacing elements + top/bottom margins
+        per_item_height = 20
+        log_section_height = (18 + len(logs) * 13) if logs else 0
+        exact_height = base_height + (len(items) * per_item_height) + log_section_height
         pagesize = (page_width, exact_height)
         
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=pagesize, rightMargin=12, leftMargin=12, topMargin=12, bottomMargin=12)
+        doc = SimpleDocTemplate(buffer, pagesize=pagesize,
+                               rightMargin=side_margin, leftMargin=side_margin,
+                               topMargin=14, bottomMargin=14)
         story = []
-        styles = getSampleStyleSheet()
         
-        # Force all texts to be bold (Helvetica-Bold) and solid black (#000000) for thermal print density
-        body_bold = ParagraphStyle(
-            'DocBodyBold',
-            fontName='Helvetica-Bold',
-            fontSize=8,
-            leading=11,
-            textColor=colors.black
-        )
+        # ══════════════════════════════════════════════
+        #  TOP BORDER LINE
+        # ══════════════════════════════════════════════
+        story.append(make_line(2.0))
+        story.append(Spacer(1, 8))
         
-        body_style = ParagraphStyle(
-            'DocBody',
-            parent=body_bold
-        )
- 
-        # Stacked Header Section (No image logo to prevent blackout box)
-        story.append(Paragraph("<b>M N B   S H O P I E</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.black, alignment=1)))
-        story.append(Paragraph("C U R A T E D   I M P O R T E D   L U X U R Y", ParagraphStyle('BrandSub', fontName='Helvetica-Bold', fontSize=6.5, leading=9, textColor=colors.black, alignment=1)))
-        story.append(Paragraph("GSTIN: 29AEUPS8210E1Z1", ParagraphStyle('GSTText', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black, alignment=1)))
+        # ══════════════════════════════════════════════
+        #  BRAND HEADER (centered, letter-spaced, premium)
+        # ══════════════════════════════════════════════
+        story.append(Paragraph("<b>M N B  S H O P I E</b>", cbold('BN', 12, 15)))
         story.append(Spacer(1, 2))
-        story.append(Paragraph("A ONE STOP SHOP FOR YOUR NEEDS", ParagraphStyle('BrandTagline', fontName='Helvetica-Bold', fontSize=6, leading=8, textColor=colors.black, alignment=1)))
-        story.append(Spacer(1, 4))
+        story.append(Paragraph("CURATED IMPORTED LUXURY", cbold('BT', 6, 8)))
+        story.append(Spacer(1, 3))
+        story.append(Paragraph("GSTIN: 29AEUPS8210E1Z1", cbold('GST', 7, 10)))
+        story.append(Spacer(1, 5))
         
-        story.append(Paragraph("<b>I N V O I C E   R E C E I P T</b>", ParagraphStyle('InvoiceTitle', fontName='Helvetica-Bold', fontSize=8, leading=11, textColor=colors.black, alignment=1)))
-        story.append(Paragraph(f"<b>No: {bill_no}</b>", ParagraphStyle('InvoiceNo', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black, alignment=1)))
-        story.append(Paragraph(f"Date: {bill['date']}", ParagraphStyle('InvoiceDate', fontName='Helvetica-Bold', fontSize=7, leading=10, textColor=colors.black, alignment=1)))
-        story.append(Spacer(1, 4))
+        # Decorative dashed separator
+        story.append(make_deco())
+        story.append(Spacer(1, 5))
         
-        # Elegant double divider line
-        line_table = Table([[""], [""]], colWidths=[206], rowHeights=[1, 1])
-        line_table.setStyle(TableStyle([
-            ('LINEBELOW', (0,0), (-1,-1), 0.5, colors.black),
-            ('PADDING', (0,0), (-1,-1), 0),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
-            ('TOPPADDING', (0,0), (-1,-1), 0),
-        ]))
-        story.append(line_table)
-        story.append(Spacer(1, 4))
+        # ══════════════════════════════════════════════
+        #  INVOICE INFO (centered, properly spaced title)
+        # ══════════════════════════════════════════════
+        story.append(Paragraph("<b>INVOICE&nbsp;&nbsp;&nbsp;&nbsp;RECEIPT</b>", cbold('IT', 9, 12)))
+        story.append(Spacer(1, 3))
+        story.append(Paragraph(f"<b>No: {bill_no}</b>", cbold('INO', 7.5, 10)))
+        story.append(Paragraph(f"Date: {bill['date']}", cbold('IDT', 7, 10)))
+        story.append(Spacer(1, 5))
+        story.append(make_line(0.8))
+        story.append(Spacer(1, 5))
         
-        # Billing Metadata Table
+        # ══════════════════════════════════════════════
+        #  CUSTOMER INFO (labels right-aligned so left-edge
+        #  clipping doesn't hide them)
+        # ══════════════════════════════════════════════
         status_labels = {
-            'completed': 'PAID / COMPLETED',
-            'partially_refunded': 'PARTIALLY RETURNED',
+            'completed': 'PAID',
+            'partially_refunded': 'PARTIAL RETURN',
             'exchanged': 'EXCHANGED',
-            'refunded': 'FULLY REFUNDED'
+            'refunded': 'REFUNDED'
         }
         bill_status = bill.get('status', 'completed')
         status_label = status_labels.get(bill_status, bill_status.upper())
+        customer_name = (bill['customer_email'] if bill['customer_email'] else "Walk-in Customer").upper()
+        
+        lbl_style = ParagraphStyle('Lbl', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black, alignment=2)
+        val_style = ParagraphStyle('Val', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black, alignment=0)
         
         billing_data = [
-            [Paragraph("<b>CUSTOMER:</b>", body_bold), Paragraph((bill['customer_email'] if bill['customer_email'] else "Walk-in Customer").upper(), body_style)],
-            [Paragraph("<b>STATUS:</b>", body_bold), Paragraph(status_label, ParagraphStyle('InvoiceStatus', parent=body_style, textColor=colors.black, fontName='Helvetica-Bold'))]
+            [Paragraph("Customer :", lbl_style), Paragraph(customer_name, val_style)],
+            [Paragraph("Status :", lbl_style), Paragraph(status_label, val_style)]
         ]
-        billing_table = Table(billing_data, colWidths=[65, 141])
+        billing_table = Table(billing_data, colWidths=[62, 120])
         billing_table.setStyle(TableStyle([
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('PADDING', (0,0), (-1,-1), 1),
-            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('PADDING', (0,0), (-1,-1), 2),
+            ('LEFTPADDING', (0,0), (0,-1), 6),
+            ('RIGHTPADDING', (0,0), (0,-1), 4),
         ]))
         story.append(billing_table)
-        story.append(Spacer(1, 6))
+        story.append(Spacer(1, 5))
+        story.append(make_line(0.8))
+        story.append(Spacer(1, 4))
         
-        # Items Table Headers
+        # ══════════════════════════════════════════════
+        #  ITEMS TABLE (wider QTY/RET cols to prevent
+        #  vertical text wrapping)
+        # ══════════════════════════════════════════════
         th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)
-        th_right = ParagraphStyle('THRight', parent=th_style, alignment=2)
-        th_center = ParagraphStyle('THCenter', parent=th_style, alignment=1)
+        th_right = ParagraphStyle('THR', parent=th_style, alignment=2)
+        th_center = ParagraphStyle('THC', parent=th_style, alignment=1)
         
+        # Column widths: 70 + 36 + 24 + 24 + 28 = 182 (matches printable_width)
         items_data = [[
-            Paragraph("Item Description", th_style),
-            Paragraph("Price", th_right),
-            Paragraph("Qty", th_center),
-            Paragraph("Ret", th_center),
-            Paragraph("Total", th_right)
+            Paragraph("ITEM", th_style),
+            Paragraph("PRICE", th_right),
+            Paragraph("QTY", th_center),
+            Paragraph("RET", th_center),
+            Paragraph("TOTAL", th_right)
         ]]
         
-        # Populate items
         td_style = ParagraphStyle('TD', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)
-        td_right = ParagraphStyle('TDRight', parent=td_style, alignment=2)
-        td_center = ParagraphStyle('TDCenter', parent=td_style, alignment=1)
+        td_right = ParagraphStyle('TDR', parent=td_style, alignment=2)
+        td_center = ParagraphStyle('TDC', parent=td_style, alignment=1)
         
         for item in items:
             name = item.get('product_name', 'Product')
@@ -1430,71 +1455,75 @@ def generate_bill_thermal_pdf(bill_no):
             
             items_data.append([
                 Paragraph(name, td_style),
-                Paragraph(f"{price:.2f}", td_right),
+                Paragraph(f"{price:.0f}", td_right),
                 Paragraph(str(qty), td_center),
                 Paragraph(str(returned) if returned > 0 else "0", td_center),
-                Paragraph(f"{subtotal:.2f}", td_right)
+                Paragraph(f"{subtotal:.0f}", td_right)
             ])
-            
-        # Grand Total row (merged columns 0 to 3 to prevent vertical string wrapping)
+        
+        # Grand Total row (span cols 0-3 for label)
         items_data.append([
-            Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=0, textColor=colors.black)),
+            Paragraph("<b>NET PAID</b>", ParagraphStyle('GTL', fontName='Helvetica-Bold', fontSize=8, leading=11, textColor=colors.black)),
             "", "", "",
-            Paragraph(f"<b>Rs. {float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.black))
+            Paragraph(f"<b>Rs.{float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTV', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.black))
         ])
         
-        items_table = Table(items_data, colWidths=[90, 42, 17, 17, 40])
+        items_table = Table(items_data, colWidths=[70, 36, 24, 24, 28])
         items_table.setStyle(TableStyle([
-            ('LINEABOVE', (0,0), (-1,0), 0.5, colors.black),
-            ('LINEBELOW', (0,0), (-1,0), 0.5, colors.black),
+            # Header row styling
+            ('LINEABOVE', (0,0), (-1,0), 0.8, colors.black),
+            ('LINEBELOW', (0,0), (-1,0), 0.8, colors.black),
             ('TOPPADDING', (0,0), (-1,0), 4),
             ('BOTTOMPADDING', (0,0), (-1,0), 4),
             
+            # Data rows
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('TOPPADDING', (0,1), (-1,-2), 4),
             ('BOTTOMPADDING', (0,1), (-1,-2), 4),
             ('LINEBELOW', (0,1), (-1,-2), 0.3, colors.black),
             
+            # Grand total row
             ('SPAN', (0, -1), (3, -1)),
-            ('LINEABOVE', (0, -1), (-1, -1), 0.5, colors.black),
-            ('LINEBELOW', (0, -1), (-1, -1), 1.2, colors.black),
+            ('LINEABOVE', (0, -1), (-1, -1), 0.8, colors.black),
+            ('LINEBELOW', (0, -1), (-1, -1), 1.5, colors.black),
             ('TOPPADDING', (0, -1), (-1, -1), 5),
             ('BOTTOMPADDING', (0, -1), (-1, -1), 5),
         ]))
         story.append(items_table)
-        story.append(Spacer(1, 8))
+        story.append(Spacer(1, 6))
         
-        # Activity Logs Section
+        # ══════════════════════════════════════════════
+        #  ACTIVITY LOGS (if any)
+        # ══════════════════════════════════════════════
         if logs:
-            story.append(Paragraph("<b>RETURN & EXCHANGE HISTORIC LOG</b>", ParagraphStyle('LogTitle', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)))
+            story.append(Paragraph("<b>RETURN &amp; EXCHANGE LOG</b>", cbold('LT', 7.5, 10)))
             story.append(Spacer(1, 3))
             for log in logs:
                 log_items_str = ", ".join([f"{it['action'].upper()}: {it['quantity']}x {it['product_name']}" for it in log.get('items_involved', [])])
                 cash_str = f"Delta: Rs. {float(log.get('cash_delta', 0.0)):.2f}"
-                log_p_style = ParagraphStyle('LogP', fontName='Helvetica-Bold', fontSize=7, leading=10, textColor=colors.black)
-                story.append(Paragraph(f"• <b>[{log['date']}] {log['type'].upper()}:</b> {log_items_str} ({cash_str})", log_p_style))
+                log_p_style = ParagraphStyle('LP', fontName='Helvetica-Bold', fontSize=6.5, leading=9, textColor=colors.black)
+                story.append(Paragraph(f"[{log['date']}] {log['type'].upper()}: {log_items_str} ({cash_str})", log_p_style))
                 story.append(Spacer(1, 2))
-            story.append(Spacer(1, 8))
-            
-        # Greeting
-        footer_style = ParagraphStyle(
-            'DocFooter',
-            fontName='Helvetica-Bold',
-            fontSize=7,
-            leading=10,
-            textColor=colors.black,
-            alignment=1
-        )
-        story.append(Paragraph("EXCLUSIVE CURATED GOODS FOR THE DISCERNING", footer_style))
-        story.append(Spacer(1, 2))
-        story.append(Paragraph("Thank you for shopping at MNB Shopie. We appreciate your business.", ParagraphStyle('DocFooterSub', fontName='Helvetica-Bold', fontSize=6, leading=9, textColor=colors.black, alignment=1)))
+            story.append(Spacer(1, 4))
         
-        # Draw solid black border around the page corners
+        # ══════════════════════════════════════════════
+        #  FOOTER (thank-you message only, no tagline)
+        # ══════════════════════════════════════════════
+        story.append(make_deco())
+        story.append(Spacer(1, 5))
+        
+        footer_style = ParagraphStyle('Ftr', fontName='Helvetica-Bold', fontSize=7, leading=10, textColor=colors.black, alignment=1)
+        story.append(Paragraph("Thank you for shopping at MNB Shopie,", footer_style))
+        story.append(Paragraph("Please do visit us again!!", footer_style))
+        story.append(Spacer(1, 6))
+        story.append(make_line(2.0))
+        
+        # Draw solid black border inset enough for faulty edge printing
         def draw_border(canvas, doc):
             canvas.saveState()
             canvas.setStrokeColor(colors.black)
             canvas.setLineWidth(1.5)
-            canvas.rect(4, 4, page_width - 8, exact_height - 8)
+            canvas.rect(8, 8, page_width - 16, exact_height - 16)
             canvas.restoreState()
             
         doc.build(story, onFirstPage=draw_border)
