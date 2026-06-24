@@ -208,6 +208,25 @@ def fetch_image_by_name(name):
             logging.warning(f"OFF Name Search failed: {e}")
             
     if not image_url:
+        # 2.5 Try Open Beauty Facts Text Search (Cosmetics/Beauty products)
+        try:
+            logging.info(f"Searching Open Beauty Facts by name: {name}")
+            query = urllib.parse.quote(name)
+            url = f"https://world.openbeautyfacts.org/cgi/search.pl?search_terms={query}&json=true&page_size=3"
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code == 200:
+                obf_data = res.json()
+                products = obf_data.get('products', [])
+                for p in products:
+                    img = p.get('image_front_url') or p.get('image_url')
+                    if img:
+                        image_url = img
+                        logging.info(f"Open Beauty Facts Name Search Match Image: {image_url}")
+                        break
+        except Exception as e:
+            logging.warning(f"Open Beauty Facts Name Search failed: {e}")
+            
+    if not image_url:
         # 3. Try Open Library Search (for books/ISBNs)
         try:
             logging.info(f"Searching Open Library by title: {name}")
@@ -289,6 +308,20 @@ def fetch_images_by_name(name):
     try:
         query = urllib.parse.quote(name)
         url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&json=true&page_size=3"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            for p in res.json().get('products', []):
+                for key in ['image_front_url', 'image_url', 'image_small_url']:
+                    img = p.get(key)
+                    if img and img not in images:
+                        images.append(img)
+    except Exception:
+        pass
+
+    # 2.5 Open Beauty Facts Search (Cosmetics/Beauty products)
+    try:
+        query = urllib.parse.quote(name)
+        url = f"https://world.openbeautyfacts.org/cgi/search.pl?search_terms={query}&json=true&page_size=3"
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
             for p in res.json().get('products', []):
@@ -399,6 +432,28 @@ def _get_product_from_web_raw(barcode):
                     return full_name, image_url
     except Exception as e:
         logging.warning(f"Open Food Facts lookup failed: {e}")
+
+    # 1.5 Try Open Beauty Facts API (Cosmetics/Beauty/Deodorants)
+    try:
+        url = f"https://world.openbeautyfacts.org/api/v2/product/{barcode}.json"
+        logging.info(f"Querying Open Beauty Facts for barcode: {barcode}")
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get('status') == 1 and 'product' in data:
+                prod = data['product']
+                brand = prod.get('brands', '')
+                name = prod.get('product_name', '')
+                qty_str = prod.get('quantity', '')
+                full_name = f"{brand} {name}".strip()
+                if qty_str:
+                    full_name += f" ({qty_str})"
+                image_url = prod.get('image_front_url') or prod.get('image_url') or prod.get('image_small_url') or ''
+                if name:
+                    logging.info(f"Open Beauty Facts Match: {full_name}")
+                    return full_name, image_url
+    except Exception as e:
+        logging.warning(f"Open Beauty Facts lookup failed: {e}")
 
     # 2. Try UPCitemdb API (General retail items)
     try:
@@ -951,8 +1006,17 @@ def delete_product():
             res = requests.delete(url, headers=supabase_headers(), timeout=10)
             if res.status_code not in (200, 204):
                 logging.error(f"Supabase DELETE failed: {res.status_code} - {res.text}")
+                err_msg = "Failed to delete product from database."
+                try:
+                    err_data = res.json()
+                    if err_data.get('code') == '23503':
+                        err_msg = "Cannot delete product because it has associated sales history or billing records."
+                except Exception:
+                    pass
+                return jsonify({'error': err_msg}), res.status_code
         except Exception as e:
             logging.error(f"Error deleting from Supabase: {e}")
+            return jsonify({'error': str(e)}), 500
             
     write_inventory(filtered_products)
     return jsonify({'success': True, 'inventory': get_inventory_response(filtered_products)})

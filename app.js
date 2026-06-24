@@ -1253,8 +1253,10 @@ async function submitProductDelete() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sku: skuToDelete })
         });
-        if (!res.ok) throw new Error('Delete failed');
         const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error || 'Delete failed');
+        }
         closeModal(deletePromptModal);
         inventory = data.inventory;
         renderInventory();
@@ -1265,7 +1267,7 @@ async function submitProductDelete() {
         showToast('Product deleted');
         skuToDelete = '';
     } catch (err) {
-        showToast('Delete failed', 'error');
+        showToast(err.message, 'error');
     }
 }
 
