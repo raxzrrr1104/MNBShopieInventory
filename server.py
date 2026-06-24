@@ -1092,20 +1092,249 @@ def generate_bill_pdf(bill_no):
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib import colors
         
-        # Calculate dynamic page size for RP 3160 Gold (80mm width)
-        # 80mm in points is ~226. Margins of 10 points left and right leaves 206 points of printable width.
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=54, leftMargin=54, topMargin=54, bottomMargin=54)
+        story = []
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle(
+            'DocTitle',
+            fontName='Helvetica-Bold',
+            fontSize=22,
+            leading=26,
+            textColor=colors.HexColor('#1e293b'),
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'DocSubTitle',
+            fontName='Helvetica',
+            fontSize=9.5,
+            leading=13,
+            textColor=colors.HexColor('#64748b'),
+            spaceAfter=15
+        )
+        
+        body_style = ParagraphStyle(
+            'DocBody',
+            fontName='Helvetica',
+            fontSize=9,
+            leading=13,
+            textColor=colors.HexColor('#334155')
+        )
+        
+        body_bold = ParagraphStyle(
+            'DocBodyBold',
+            parent=body_style,
+            fontName='Helvetica-Bold'
+        )
+        
+        # Try to load brand logo Image
+        brand_logo = None
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'image.png')
+        if os.path.exists(logo_path):
+            try:
+                from reportlab.platypus import Image as RLImage
+                # 120 width, 38 height keeps aspect ratio perfect
+                brand_logo = RLImage(logo_path, width=120, height=38)
+            except Exception as logo_err:
+                logging.error(f"Error loading brand logo for PDF: {logo_err}")
+
+        # Header Section
+        header_left_flow = []
+        if brand_logo:
+            header_left_flow.append(brand_logo)
+            header_left_flow.append(Spacer(1, 4))
+        header_left_flow.append(Paragraph("<b>MNB Shopie — Curated Imported Luxury</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=10, leading=14, textColor=colors.HexColor('#1e293b'))))
+        header_left_flow.append(Paragraph("A one stop shop, for all your needs!", subtitle_style))
+
+        header_data = [
+            [
+                header_left_flow,
+                [
+                    Paragraph(f"<b>INVOICE {bill_no}</b>", ParagraphStyle('InvoiceTitle', fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor('#4f46e5'), alignment=2)),
+                    Spacer(1, 4),
+                    Paragraph(f"Date: {bill['date']}", ParagraphStyle('InvoiceDate', fontName='Helvetica', fontSize=9, leading=13, textColor=colors.HexColor('#64748b'), alignment=2))
+                ]
+            ]
+        ]
+        
+        header_table = Table(header_data, colWidths=[252, 252])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('PADDING', (0,0), (-1,-1), 0),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ]))
+        story.append(header_table)
+        story.append(Spacer(1, 10))
+        
+        # Decorative colored line
+        line_table = Table([[""]], colWidths=[504])
+        line_table.setStyle(TableStyle([
+            ('LINEBELOW', (0,0), (-1,-1), 2, colors.HexColor('#4f46e5')),
+            ('PADDING', (0,0), (-1,-1), 0),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+            ('TOPPADDING', (0,0), (-1,-1), 0),
+        ]))
+        story.append(line_table)
+        story.append(Spacer(1, 15))
+        
+        # Billing Metadata Table
+        status_colors = {
+            'completed': '#059669',
+            'partially_refunded': '#d97706',
+            'exchanged': '#4f46e5',
+            'refunded': '#dc2626'
+        }
+        status_labels = {
+            'completed': 'PAID / COMPLETED',
+            'partially_refunded': 'PARTIALLY RETURNED',
+            'exchanged': 'EXCHANGED',
+            'refunded': 'FULLY REFUNDED'
+        }
+        bill_status = bill.get('status', 'completed')
+        status_color = status_colors.get(bill_status, '#059669')
+        status_label = status_labels.get(bill_status, bill_status.upper())
+        
+        billing_data = [
+            [Paragraph("<b>Billed To:</b>", body_bold), Paragraph(bill['customer_email'] if bill['customer_email'] else "Walk-in Customer", body_style)],
+            [Paragraph("<b>Invoice Status:</b>", body_bold), Paragraph(status_label, ParagraphStyle('InvoiceStatus', parent=body_style, textColor=colors.HexColor(status_color), fontName='Helvetica-Bold'))]
+        ]
+        billing_table = Table(billing_data, colWidths=[100, 404])
+        billing_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('PADDING', (0,0), (-1,-1), 2),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ]))
+        story.append(billing_table)
+        story.append(Spacer(1, 20))
+        
+        # Items Table Headers
+        th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=8.5, leading=11, textColor=colors.HexColor('#475569'))
+        th_right = ParagraphStyle('THRight', parent=th_style, alignment=2)
+        th_center = ParagraphStyle('THCenter', parent=th_style, alignment=1)
+        
+        items_data = [[
+            Paragraph("Product Description", th_style),
+            Paragraph("Unit Price", th_right),
+            Paragraph("Qty", th_center),
+            Paragraph("Ret", th_center),
+            Paragraph("Net Amount", th_right)
+        ]]
+        
+        # Populate items
+        td_style = ParagraphStyle('TD', fontName='Helvetica', fontSize=9, leading=12, textColor=colors.HexColor('#0f172a'))
+        td_right = ParagraphStyle('TDRight', parent=td_style, alignment=2)
+        td_center = ParagraphStyle('TDCenter', parent=td_style, alignment=1)
+        
+        for item in items:
+            name = item.get('product_name', 'Product')
+            qty = int(item.get('quantity', 0))
+            returned = int(item.get('returned_quantity', 0) or 0)
+            price = float(item.get('final_sold_price', 0.0))
+            net_qty = max(0, qty - returned)
+            subtotal = price * net_qty
+            
+            items_data.append([
+                Paragraph(name, td_style),
+                Paragraph(f"Rs. {price:.2f}", td_right),
+                Paragraph(str(qty), td_center),
+                Paragraph(str(returned) if returned > 0 else "0", td_center),
+                Paragraph(f"Rs. {subtotal:.2f}", td_right)
+            ])
+            
+        # spacing row
+        items_data.append(["", "", "", "", ""])
+        
+        # Grand Total row
+        items_data.append([
+            "", "", "",
+            Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=10, leading=13, alignment=2, textColor=colors.HexColor('#0f172a'))),
+            Paragraph(f"<b>Rs. {float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=11, leading=13, alignment=2, textColor=colors.HexColor('#4f46e5')))
+        ])
+        
+        items_table = Table(items_data, colWidths=[204, 80, 50, 50, 120])
+        items_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f8fafc')),
+            ('TOPPADDING', (0,0), (-1,0), 6),
+            ('BOTTOMPADDING', (0,0), (-1,0), 6),
+            ('LINEBELOW', (0,0), (-1,0), 1, colors.HexColor('#e2e8f0')),
+            
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING', (0,1), (-1,-3), 6),
+            ('BOTTOMPADDING', (0,1), (-1,-3), 6),
+            ('LINEBELOW', (0,1), (-1,-3), 0.5, colors.HexColor('#f1f5f9')),
+            
+            ('LINEABOVE', (3,-1), (4,-1), 1.5, colors.HexColor('#cbd5e1')),
+            ('TOPPADDING', (3,-1), (4,-1), 10),
+            ('BOTTOMPADDING', (3,-1), (4,-1), 10),
+        ]))
+        story.append(items_table)
+        story.append(Spacer(1, 15))
+        
+        # Activity Logs Section in PDF
+        if logs:
+            story.append(Paragraph("<b>Transaction Return & Exchange Logs</b>", ParagraphStyle('LogTitle', fontName='Helvetica-Bold', fontSize=10, leading=14, textColor=colors.HexColor('#1e293b'))))
+            story.append(Spacer(1, 5))
+            for log in logs:
+                log_items_str = ", ".join([f"{it['action'].upper()}: {it['quantity']}x {it['product_name']}" for it in log.get('items_involved', [])])
+                cash_str = f"Cash Adjustment: Rs. {float(log.get('cash_delta', 0.0)):.2f}"
+                log_p_style = ParagraphStyle('LogP', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#475569'))
+                story.append(Paragraph(f"• <b>[{log['date']}] {log['type'].upper()}:</b> {log_items_str} ({cash_str})", log_p_style))
+                story.append(Spacer(1, 3))
+            story.append(Spacer(1, 15))
+            
+        # Greeting
+        footer_style = ParagraphStyle(
+            'DocFooter',
+            fontName='Helvetica-Oblique',
+            fontSize=8.5,
+            leading=12,
+            textColor=colors.HexColor('#94a3b8'),
+            alignment=1
+        )
+        story.append(Paragraph("Thank you for choosing MNB Shopie. We appreciate your business!", footer_style))
+        
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        return pdf_bytes
+    except Exception as e:
+        logging.error(f"Error generating bill PDF: {e}")
+        return None
+
+def generate_bill_thermal_pdf(bill_no):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return None
+        
+    try:
+        encoded_bill = urllib.parse.quote(bill_no)
+        res_bill = requests.get(f"{SUPABASE_URL}/rest/v1/bills?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
+        if res_bill.status_code != 200 or not res_bill.json():
+            return None
+        bill = res_bill.json()[0]
+        
+        res_items = requests.get(f"{SUPABASE_URL}/rest/v1/bill_items?bill_no=eq.{encoded_bill}", headers=supabase_headers(), timeout=10)
+        items = res_items.json() if res_items.status_code == 200 else []
+        
+        res_logs = requests.get(f"{SUPABASE_URL}/rest/v1/transaction_logs?parent_bill_no=eq.{encoded_bill}&order=date.desc", headers=supabase_headers(), timeout=10)
+        logs = res_logs.json() if res_logs.status_code == 200 else []
+        
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        
         page_width = 226
         
         # Base height estimate: margins, stacked header elements, status block, greeting footer, spacers.
-        base_height = 190
-        
-        # Items table height estimate: header row, actual items, spacing/total rows.
-        item_height = 20 + (len(items) * 18) + 30
-        
+        base_height = 200
+        # Items table height estimate: header row, actual items.
+        item_height = 20 + (len(items) * 22) + 25
         # Logs height estimate.
-        log_height = (20 + (len(logs) * 20)) if logs else 0
+        log_height = (25 + (len(logs) * 25)) if logs else 0
         
-        calculated_height = max(350, base_height + item_height + log_height)
+        # Set a very safe, generous page height limit to prevent page-breaks on roll printers.
+        # Extra spacing is ignored by roll thermal cutting drivers.
+        calculated_height = max(420, base_height + item_height + log_height)
         pagesize = (page_width, calculated_height)
         
         buffer = io.BytesIO()
@@ -1116,9 +1345,9 @@ def generate_bill_pdf(bill_no):
         title_style = ParagraphStyle(
             'DocTitle',
             fontName='Helvetica-Bold',
-            fontSize=12,
-            leading=15,
-            textColor=colors.HexColor('#1e293b'),
+            fontSize=11,
+            leading=14,
+            textColor=colors.HexColor('#000000'),
             alignment=1
         )
         
@@ -1127,7 +1356,7 @@ def generate_bill_pdf(bill_no):
             fontName='Helvetica',
             fontSize=8,
             leading=11,
-            textColor=colors.HexColor('#64748b'),
+            textColor=colors.HexColor('#475569'),
             spaceAfter=8,
             alignment=1
         )
@@ -1152,19 +1381,18 @@ def generate_bill_pdf(bill_no):
         if os.path.exists(logo_path):
             try:
                 from reportlab.platypus import Image as RLImage
-                # Scale down for narrow 80mm layout (max content width is 206)
                 brand_logo = RLImage(logo_path, width=80, height=25)
                 brand_logo.hAlign = 'CENTER'
             except Exception as logo_err:
                 logging.error(f"Error loading brand logo for PDF: {logo_err}")
  
-        # Stacked Header Section (optimized for narrow thermal paper with luxury styling)
+        # Stacked Header Section
         if brand_logo:
             story.append(brand_logo)
             story.append(Spacer(1, 4))
         story.append(Paragraph("<b>M N B   S H O P I E</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor('#000000'), alignment=1)))
         story.append(Paragraph("C U R A T E D   I M P O R T E D   L U X U R Y", ParagraphStyle('BrandSub', fontName='Helvetica-Bold', fontSize=6.5, leading=9, textColor=colors.HexColor('#475569'), alignment=1)))
-        story.append(Spacer(1, 3))
+        story.append(Spacer(1, 2))
         story.append(Paragraph("A ONE STOP SHOP FOR YOUR NEEDS", ParagraphStyle('BrandTagline', fontName='Helvetica-Oblique', fontSize=6, leading=8, textColor=colors.HexColor('#64748b'), alignment=1)))
         story.append(Spacer(1, 6))
         
@@ -1173,7 +1401,7 @@ def generate_bill_pdf(bill_no):
         story.append(Paragraph(f"Date: {bill['date']}", ParagraphStyle('InvoiceDate', fontName='Helvetica', fontSize=7, leading=10, textColor=colors.HexColor('#475569'), alignment=1)))
         story.append(Spacer(1, 4))
         
-        # Elegant double divider line (width 206)
+        # Elegant double divider line
         line_table = Table([[""], [""]], colWidths=[206], rowHeights=[1, 1])
         line_table.setStyle(TableStyle([
             ('LINEBELOW', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
@@ -1248,13 +1476,10 @@ def generate_bill_pdf(bill_no):
                 Paragraph(f"{subtotal:.2f}", td_right)
             ])
             
-        # spacing row
-        items_data.append(["", "", "", "", ""])
-        
-        # Grand Total row
+        # Grand Total row (merged columns 0 to 3 to prevent vertical string wrapping)
         items_data.append([
+            Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=0, textColor=colors.HexColor('#000000'))),
             "", "", "",
-            Paragraph("<b>Net Paid</b>", ParagraphStyle('GTotalLabel', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.HexColor('#000000'))),
             Paragraph(f"<b>Rs. {float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTotalVal', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.HexColor('#000000')))
         ])
         
@@ -1266,19 +1491,20 @@ def generate_bill_pdf(bill_no):
             ('BOTTOMPADDING', (0,0), (-1,0), 4),
             
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('TOPPADDING', (0,1), (-1,-3), 4),
-            ('BOTTOMPADDING', (0,1), (-1,-3), 4),
-            ('LINEBELOW', (0,1), (-1,-3), 0.3, colors.HexColor('#cbd5e1')),
+            ('TOPPADDING', (0,1), (-1,-2), 4),
+            ('BOTTOMPADDING', (0,1), (-1,-2), 4),
+            ('LINEBELOW', (0,1), (-1,-2), 0.3, colors.HexColor('#cbd5e1')),
             
-            ('LINEABOVE', (3,-1), (4,-1), 0.5, colors.HexColor('#000000')),
-            ('LINEBELOW', (3,-1), (4,-1), 1.2, colors.HexColor('#000000')),
-            ('TOPPADDING', (3,-1), (4,-1), 5),
-            ('BOTTOMPADDING', (3,-1), (4,-1), 5),
+            ('SPAN', (0, -1), (3, -1)),
+            ('LINEABOVE', (0, -1), (-1, -1), 0.5, colors.HexColor('#000000')),
+            ('LINEBELOW', (0, -1), (-1, -1), 1.2, colors.HexColor('#000000')),
+            ('TOPPADDING', (0, -1), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 5),
         ]))
         story.append(items_table)
         story.append(Spacer(1, 10))
         
-        # Activity Logs Section in PDF
+        # Activity Logs Section
         if logs:
             story.append(Paragraph("<b>RETURN & EXCHANGE HISTORIC LOG</b>", ParagraphStyle('LogTitle', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#000000'))))
             story.append(Spacer(1, 3))
@@ -1308,7 +1534,7 @@ def generate_bill_pdf(bill_no):
         buffer.close()
         return pdf_bytes
     except Exception as e:
-        logging.error(f"Error generating bill PDF: {e}")
+        logging.error(f"Error generating thermal bill PDF: {e}")
         return None
 
 def send_customer_receipt_email(customer_email, cart, total_amount, smtp_config, bill_no):
@@ -1712,6 +1938,22 @@ def download_bill_pdf(bill_no):
             mimetype='application/pdf',
             as_attachment=True,
             download_name=f'{bill_no}_Receipt.pdf'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/billing/print-pdf/<bill_no>', methods=['GET'])
+def download_bill_thermal_pdf(bill_no):
+    try:
+        import io
+        pdf_bytes = generate_bill_thermal_pdf(bill_no)
+        if not pdf_bytes:
+            return jsonify({'error': 'Failed to generate PDF'}), 500
+        return send_file(
+            io.BytesIO(pdf_bytes),
+            mimetype='application/pdf',
+            as_attachment=False,
+            download_name=f'{bill_no}_Receipt_Thermal.pdf'
         )
     except Exception as e:
         return jsonify({'error': str(e)}), 500

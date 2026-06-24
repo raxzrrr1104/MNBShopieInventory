@@ -2524,7 +2524,7 @@ async function downloadBillPDF(billNo) {
 async function printBillDirect(billNo) {
     try {
         showToast('Loading print document...', 'info');
-        const res = await fetch(`${BASE_URL}/api/billing/pdf/${billNo}`);
+        const res = await fetch(`${BASE_URL}/api/billing/print-pdf/${billNo}`);
         if (!res.ok) {
             showToast('Failed to load PDF for printing', 'error');
             return;
