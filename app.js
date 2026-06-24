@@ -765,6 +765,7 @@ function renderInventory() {
         const escapedName = item.name.replace(/'/g, "\\'");
         
         const intakePriceText = item.intake_price > 0 ? `Rs. ${item.intake_price.toFixed(2)}` : '—';
+        const sellingPriceText = item.selling_price > 0 ? `Rs. ${item.selling_price.toFixed(2)}` : '—';
         const avgSellingPriceText = item.avg_selling_price > 0 ? `Rs. ${item.avg_selling_price.toFixed(2)}` : '—';
 
         row.innerHTML = `
@@ -784,9 +785,10 @@ function renderInventory() {
                 </div>
             </td>
             <td>
-                <div style="display:flex; flex-direction:column; gap:0.25rem;">
-                    <span class="text-muted">In: ${intakePriceText}</span>
-                    <span class="text-green" style="font-weight: 600;">Out: ${avgSellingPriceText}</span>
+                <div style="display:flex; flex-direction:column; gap:0.15rem; font-size: 0.75rem;">
+                    <span style="color: var(--text-tertiary);">In: ${intakePriceText}</span>
+                    <span style="font-weight: 700; color: var(--text-primary); font-size: 0.8rem;">Selling: ${sellingPriceText}</span>
+                    <span class="text-green" style="font-weight: 500;">Out: ${avgSellingPriceText}</span>
                 </div>
             </td>
             <td><span class="stock-badge ${badgeClass}">${badgeText}</span></td>
