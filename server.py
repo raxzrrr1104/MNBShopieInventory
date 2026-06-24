@@ -165,26 +165,50 @@ def fetch_image_by_name(name):
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     import urllib.parse
-    # 1. Try Open Food Facts Text Search
+    
+    # 1. Try Bing Images search as primary high-reliability fallback
     try:
-        logging.info(f"Searching OFF by name: {name}")
+        logging.info(f"Searching Bing Images first for name: {name}")
         query = urllib.parse.quote(name)
-        url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&json=true&page_size=3"
+        url = f"https://www.bing.com/images/search?q={query}"
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
-            off_data = res.json()
-            products = off_data.get('products', [])
-            for p in products:
-                img = p.get('image_front_url') or p.get('image_url')
-                if img:
-                    image_url = img
-                    logging.info(f"OFF Name Search Match Image: {image_url}")
-                    break
+            from bs4 import BeautifulSoup
+            import re
+            soup = BeautifulSoup(res.text, 'html.parser')
+            links = soup.find_all('a', class_='iusc')
+            for link in links:
+                m_attr = link.get('m')
+                if m_attr:
+                    match = re.search(r'"murl"\s*:\s*"([^"]+)"', m_attr)
+                    if match:
+                        image_url = match.group(1)
+                        logging.info(f"Bing Images Match: {image_url}")
+                        break
     except Exception as e:
-        logging.warning(f"OFF Name Search failed: {e}")
+        logging.warning(f"Bing Images search failed: {e}")
         
     if not image_url:
-        # 2. Try Open Library Search (for books/ISBNs)
+        # 2. Try Open Food Facts Text Search
+        try:
+            logging.info(f"Searching OFF by name: {name}")
+            query = urllib.parse.quote(name)
+            url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&json=true&page_size=3"
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code == 200:
+                off_data = res.json()
+                products = off_data.get('products', [])
+                for p in products:
+                    img = p.get('image_front_url') or p.get('image_url')
+                    if img:
+                        image_url = img
+                        logging.info(f"OFF Name Search Match Image: {image_url}")
+                        break
+        except Exception as e:
+            logging.warning(f"OFF Name Search failed: {e}")
+            
+    if not image_url:
+        # 3. Try Open Library Search (for books/ISBNs)
         try:
             logging.info(f"Searching Open Library by title: {name}")
             query = urllib.parse.quote(name)
@@ -203,7 +227,7 @@ def fetch_image_by_name(name):
             logging.warning(f"Open Library Title Search failed: {e}")
             
     if not image_url:
-        # 3. Try DuckDuckGo Lite search link + Open Graph scraping fallback
+        # 4. Try DuckDuckGo Lite search link + Open Graph scraping fallback
         try:
             logging.info(f"Searching DDG Lite fallback for name: {name}")
             url = "https://lite.duckduckgo.com/lite/"
@@ -231,29 +255,6 @@ def fetch_image_by_name(name):
         except Exception as e:
             logging.warning(f"DDG Link Scraper failed: {e}")
             
-    if not image_url:
-        # 4. Try Bing Images search as a high-reliability fallback
-        try:
-            logging.info(f"Searching Bing Images fallback for name: {name}")
-            query = urllib.parse.quote(name)
-            url = f"https://www.bing.com/images/search?q={query}"
-            res = requests.get(url, headers=headers, timeout=5)
-            if res.status_code == 200:
-                from bs4 import BeautifulSoup
-                import re
-                soup = BeautifulSoup(res.text, 'html.parser')
-                links = soup.find_all('a', class_='iusc')
-                for link in links:
-                    m_attr = link.get('m')
-                    if m_attr:
-                        match = re.search(r'"murl"\s*:\s*"([^"]+)"', m_attr)
-                        if match:
-                            image_url = match.group(1)
-                            logging.info(f"Bing Images Match: {image_url}")
-                            break
-        except Exception as e:
-            logging.warning(f"Bing Images search failed: {e}")
-            
     return image_url
 
 def fetch_images_by_name(name):
@@ -265,7 +266,26 @@ def fetch_images_by_name(name):
     import re
     from bs4 import BeautifulSoup
     
-    # 1. OFF
+    # 1. Bing Images (Primary High-Fidelity Product Images)
+    try:
+        query = urllib.parse.quote(name)
+        url = f"https://www.bing.com/images/search?q={query}"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            soup = BeautifulSoup(res.text, 'html.parser')
+            links = soup.find_all('a', class_='iusc')
+            for link in links[:10]: # Increase max fetched images limit to 10 for better selection pool
+                m_attr = link.get('m')
+                if m_attr:
+                    match = re.search(r'"murl"\s*:\s*"([^"]+)"', m_attr)
+                    if match:
+                        img = match.group(1)
+                        if img and img not in images:
+                            images.append(img)
+    except Exception:
+        pass
+
+    # 2. OFF
     try:
         query = urllib.parse.quote(name)
         url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&json=true&page_size=3"
@@ -279,7 +299,7 @@ def fetch_images_by_name(name):
     except Exception:
         pass
 
-    # 2. Open Library
+    # 3. Open Library
     try:
         query = urllib.parse.quote(name)
         url = f"https://openlibrary.org/search.json?title={query}&limit=3"
@@ -294,7 +314,7 @@ def fetch_images_by_name(name):
     except Exception:
         pass
 
-    # 3. DuckDuckGo / Open Graph scraper
+    # 4. DuckDuckGo / Open Graph scraper
     try:
         url = "https://lite.duckduckgo.com/lite/"
         res = requests.post(url, data={'q': name}, headers=headers, timeout=5)
@@ -316,25 +336,6 @@ def fetch_images_by_name(name):
                                 images.append(img)
                 except Exception:
                     pass
-    except Exception:
-        pass
-
-    # 4. Bing Images
-    try:
-        query = urllib.parse.quote(name)
-        url = f"https://www.bing.com/images/search?q={query}"
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, 'html.parser')
-            links = soup.find_all('a', class_='iusc')
-            for link in links[:5]:
-                m_attr = link.get('m')
-                if m_attr:
-                    match = re.search(r'"murl"\s*:\s*"([^"]+)"', m_attr)
-                    if match:
-                        img = match.group(1)
-                        if img and img not in images:
-                            images.append(img)
     except Exception:
         pass
 
