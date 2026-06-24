@@ -1144,8 +1144,8 @@ def generate_bill_pdf(bill_no):
         if brand_logo:
             header_left_flow.append(brand_logo)
             header_left_flow.append(Spacer(1, 4))
-        header_left_flow.append(Paragraph("<b>MNB Shopie — Curated Imported Luxury</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=10, leading=14, textColor=colors.HexColor('#1e293b'))))
-        header_left_flow.append(Paragraph("A one stop shop, for all your needs!", subtitle_style))
+        header_left_flow.append(Paragraph("<b>MNB Shopie</b>", ParagraphStyle('BrandText', fontName='Helvetica-Bold', fontSize=10, leading=14, textColor=colors.HexColor('#1e293b'))))
+        header_left_flow.append(Paragraph("One Stop Shop, for all your needs!", subtitle_style))
 
         header_data = [
             [
@@ -1371,7 +1371,7 @@ def generate_bill_thermal_pdf(bill_no):
         # ══════════════════════════════════════════════
         story.append(Paragraph("<b>M N B  S H O P I E</b>", cbold('BN', 12, 15)))
         story.append(Spacer(1, 2))
-        story.append(Paragraph("CURATED IMPORTED LUXURY", cbold('BT', 6, 8)))
+        story.append(Paragraph("One Stop Shop, for all your needs!", cbold('BT', 7, 9)))
         story.append(Spacer(1, 3))
         story.append(Paragraph("GSTIN: 29AEUPS8210E1Z1", cbold('GST', 7, 10)))
         story.append(Spacer(1, 5))
@@ -1428,7 +1428,7 @@ def generate_bill_thermal_pdf(bill_no):
         #  ITEMS TABLE (wider QTY/RET cols to prevent
         #  vertical text wrapping)
         # ══════════════════════════════════════════════
-        th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)
+        th_style = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=7, leading=9, textColor=colors.black)
         th_right = ParagraphStyle('THR', parent=th_style, alignment=2)
         th_center = ParagraphStyle('THC', parent=th_style, alignment=1)
         
@@ -1441,7 +1441,7 @@ def generate_bill_thermal_pdf(bill_no):
             Paragraph("TOTAL", th_right)
         ]]
         
-        td_style = ParagraphStyle('TD', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)
+        td_style = ParagraphStyle('TD', fontName='Helvetica-Bold', fontSize=7, leading=9, textColor=colors.black)
         td_right = ParagraphStyle('TDR', parent=td_style, alignment=2)
         td_center = ParagraphStyle('TDC', parent=td_style, alignment=1)
         
@@ -1461,15 +1461,20 @@ def generate_bill_thermal_pdf(bill_no):
                 Paragraph(f"{subtotal:.0f}", td_right)
             ])
         
-        # Grand Total row (span cols 0-3 for label)
+        # Grand Total row (span cols 0-2 for label, and cols 3-4 for value)
         items_data.append([
-            Paragraph("<b>NET PAID</b>", ParagraphStyle('GTL', fontName='Helvetica-Bold', fontSize=8, leading=11, textColor=colors.black)),
-            "", "", "",
-            Paragraph(f"<b>Rs.{float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTV', fontName='Helvetica-Bold', fontSize=8, leading=11, alignment=2, textColor=colors.black))
+            Paragraph("<b>NET PAID</b>", ParagraphStyle('GTL', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)),
+            "", "",
+            Paragraph(f"<b>Rs.{float(bill['net_amount']):.2f}</b>", ParagraphStyle('GTV', fontName='Helvetica-Bold', fontSize=7.5, leading=10, alignment=2, textColor=colors.black)),
+            ""
         ])
         
         items_table = Table(items_data, colWidths=[70, 36, 24, 24, 28])
         items_table.setStyle(TableStyle([
+            # Padding control to fit text on a single line
+            ('LEFTPADDING', (0,0), (-1,-1), 2),
+            ('RIGHTPADDING', (0,0), (-1,-1), 2),
+            
             # Header row styling
             ('LINEABOVE', (0,0), (-1,0), 0.8, colors.black),
             ('LINEBELOW', (0,0), (-1,0), 0.8, colors.black),
@@ -1483,7 +1488,8 @@ def generate_bill_thermal_pdf(bill_no):
             ('LINEBELOW', (0,1), (-1,-2), 0.3, colors.black),
             
             # Grand total row
-            ('SPAN', (0, -1), (3, -1)),
+            ('SPAN', (0, -1), (2, -1)),
+            ('SPAN', (3, -1), (4, -1)),
             ('LINEABOVE', (0, -1), (-1, -1), 0.8, colors.black),
             ('LINEBELOW', (0, -1), (-1, -1), 1.5, colors.black),
             ('TOPPADDING', (0, -1), (-1, -1), 5),
