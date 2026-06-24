@@ -256,14 +256,116 @@ def fetch_image_by_name(name):
             
     return image_url
 
-def get_product_from_web(barcode):
+def fetch_images_by_name(name):
+    images = []
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    import urllib.parse
+    import re
+    from bs4 import BeautifulSoup
+    
+    # 1. OFF
+    try:
+        query = urllib.parse.quote(name)
+        url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&json=true&page_size=3"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            for p in res.json().get('products', []):
+                for key in ['image_front_url', 'image_url', 'image_small_url']:
+                    img = p.get(key)
+                    if img and img not in images:
+                        images.append(img)
+    except Exception:
+        pass
+
+    # 2. Open Library
+    try:
+        query = urllib.parse.quote(name)
+        url = f"https://openlibrary.org/search.json?title={query}&limit=3"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            for d in res.json().get('docs', []):
+                cover_i = d.get('cover_i')
+                if cover_i:
+                    img = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
+                    if img not in images:
+                        images.append(img)
+    except Exception:
+        pass
+
+    # 3. DuckDuckGo / Open Graph scraper
+    try:
+        url = "https://lite.duckduckgo.com/lite/"
+        res = requests.post(url, data={'q': name}, headers=headers, timeout=5)
+        if res.status_code == 200:
+            soup = BeautifulSoup(res.text, 'html.parser')
+            links = soup.find_all('a', class_='result-link')
+            for link in links[:3]:
+                target_url = link.get('href')
+                if not target_url or target_url.startswith('/') or 'duckduckgo.com' in target_url:
+                    continue
+                try:
+                    page_res = requests.get(target_url, headers=headers, timeout=3)
+                    if page_res.status_code == 200:
+                        page_soup = BeautifulSoup(page_res.text, 'html.parser')
+                        og_img = page_soup.find('meta', property='og:image') or page_soup.find('meta', attrs={'name': 'twitter:image'})
+                        if og_img and og_img.get('content'):
+                            img = og_img.get('content').strip()
+                            if img and img not in images:
+                                images.append(img)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # 4. Bing Images
+    try:
+        query = urllib.parse.quote(name)
+        url = f"https://www.bing.com/images/search?q={query}"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            soup = BeautifulSoup(res.text, 'html.parser')
+            links = soup.find_all('a', class_='iusc')
+            for link in links[:5]:
+                m_attr = link.get('m')
+                if m_attr:
+                    match = re.search(r'"murl"\s*:\s*"([^"]+)"', m_attr)
+                    if match:
+                        img = match.group(1)
+                        if img and img not in images:
+                            images.append(img)
+    except Exception:
+        pass
+
+    # Sanitize HTTP to HTTPS
+    sanitized = []
+    for img in images:
+        img_clean = img.replace('http://', 'https://')
+        if img_clean not in sanitized:
+            sanitized.append(img_clean)
+            
+    return sanitized
+
+def get_product_images_from_web(barcode):
     name, barcode_image = _get_product_from_web_raw(barcode)
+    all_images = []
+    if barcode_image:
+        all_images.append(barcode_image.replace('http://', 'https://'))
+        
     if name:
         logging.info(f"Barcode returned name '{name}'. Prioritizing name-based image search over barcode image...")
-        image = fetch_image_by_name(name)
-        if image:
-            return name, image
-    return name, barcode_image
+        web_imgs = fetch_images_by_name(name)
+        for img in web_imgs:
+            if img not in all_images:
+                all_images.append(img)
+                
+    primary_image = all_images[0] if all_images else ''
+    return name, primary_image, all_images
+
+def get_product_from_web(barcode):
+    name, primary_image, all_images = get_product_images_from_web(barcode)
+    return name, primary_image
 
 def _get_product_from_web_raw(barcode):
     """Queries Open Food Facts, UPCitemdb, Open Library, and DuckDuckGo search fallbacks with smart clutter filtering."""
@@ -528,7 +630,7 @@ def scan_barcode():
         })
         
     # 2. Barcode is new. Try to get details from the web
-    web_name, web_image = get_product_from_web(barcode)
+    web_name, web_image, web_images = get_product_images_from_web(barcode)
     
     if web_name:
         # Check for fuzzy name matches in database
@@ -538,6 +640,7 @@ def scan_barcode():
                 'status': 'similar_found',
                 'web_name': web_name,
                 'image_url': web_image,
+                'image_urls': web_images,
                 'similar': similar_products,
                 'barcode': barcode
             })
@@ -548,6 +651,7 @@ def scan_barcode():
                 'status': 'new_web_match',
                 'web_name': web_name,
                 'image_url': web_image,
+                'image_urls': web_images,
                 'sku': sku,
                 'barcode': barcode
             })
@@ -859,8 +963,9 @@ def search_product_image():
     if not name:
         return jsonify({'error': 'Name is required'}), 400
         
-    image_url = fetch_image_by_name(name)
-    return jsonify({'image_url': image_url})
+    image_urls = fetch_images_by_name(name)
+    primary_image = image_urls[0] if image_urls else ''
+    return jsonify({'image_url': primary_image, 'image_urls': image_urls})
 
 import datetime
 import smtplib
@@ -1196,6 +1301,14 @@ def send_customer_receipt_email(customer_email, cart, total_amount, smtp_config,
         price = float(item.get('sold_price', 0.0))
         subtotal = price * qty
         image_url = item.get('image_url', '')
+        if image_url and image_url.strip().startswith('['):
+            try:
+                import json as py_json
+                arr = py_json.loads(image_url)
+                if isinstance(arr, list) and arr:
+                    image_url = arr[0]
+            except Exception:
+                pass
         if not image_url:
             image_url = "https://via.placeholder.com/50x50.png?text=Item"
             

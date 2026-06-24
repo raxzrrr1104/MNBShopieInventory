@@ -20,6 +20,7 @@ let activeScanBarcode = '';
 let activeScanName = '';
 let activeScanSku = '';
 let activeScanImage = '';
+let activeScanImageUrls = [];
 let html5QrcodeScanner = null;
 let currentEditingSku = null;
 let currentFilter = 'all';
@@ -27,6 +28,110 @@ let skuToDelete = '';
 let activeMode = 'intake'; // 'intake' or 'bill'
 let categories = ['General'];
 let activeScanCategory = 'All';
+
+function getPrimaryImage(urlStr) {
+    if (!urlStr) return '';
+    urlStr = urlStr.trim();
+    if (urlStr.startsWith('[')) {
+        try {
+            const arr = JSON.parse(urlStr);
+            if (Array.isArray(arr) && arr.length > 0) {
+                return arr[0];
+            }
+        } catch (e) {}
+    }
+    return urlStr;
+}
+
+function getAllImages(urlStr) {
+    if (!urlStr) return [];
+    urlStr = urlStr.trim();
+    if (urlStr.startsWith('[')) {
+        try {
+            const arr = JSON.parse(urlStr);
+            if (Array.isArray(arr)) {
+                return arr;
+            }
+        } catch (e) {}
+    }
+    return [urlStr];
+}
+
+function renderImageSelectionThumbnails(containerId, inputEl, urlsList, previewCallback) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    
+    if (!urlsList || urlsList.length <= 1) {
+        return;
+    }
+    
+    // Clean list from duplicate or invalid values
+    const uniqueUrls = [];
+    urlsList.forEach(url => {
+        if (url && !uniqueUrls.includes(url)) {
+            uniqueUrls.push(url);
+        }
+    });
+    
+    uniqueUrls.forEach((url) => {
+        if (!url) return;
+        const img = document.createElement('img');
+        img.src = url;
+        img.style.width = '50px';
+        img.style.height = '50px';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = '8px';
+        img.style.cursor = 'pointer';
+        img.style.border = '2px solid transparent';
+        img.style.transition = 'all 0.2s ease';
+        img.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)';
+        
+        // Mark as selected if matching the input value
+        if (inputEl.value === url) {
+            img.style.borderColor = 'var(--primary)';
+            img.style.transform = 'scale(1.05)';
+        }
+        
+        img.onerror = () => {
+            img.remove();
+        };
+        
+        img.addEventListener('click', () => {
+            inputEl.value = url;
+            // Move this URL to index 0 of allImageUrls
+            const index = uniqueUrls.indexOf(url);
+            if (index > -1) {
+                uniqueUrls.splice(index, 1);
+                uniqueUrls.unshift(url);
+            }
+            inputEl._allImageUrls = uniqueUrls;
+            
+            // Re-render thumbnails to update selected border
+            renderImageSelectionThumbnails(containerId, inputEl, uniqueUrls, previewCallback);
+            
+            if (previewCallback) {
+                previewCallback(url);
+            }
+        });
+        
+        // Scale up slightly on hover
+        img.addEventListener('mouseenter', () => {
+            if (inputEl.value !== url) {
+                img.style.borderColor = 'var(--border-light)';
+                img.style.transform = 'scale(1.03)';
+            }
+        });
+        img.addEventListener('mouseleave', () => {
+            if (inputEl.value !== url) {
+                img.style.borderColor = 'transparent';
+                img.style.transform = 'scale(1)';
+            }
+        });
+        
+        container.appendChild(img);
+    });
+}
 
 
 // --- DOM References ---
@@ -333,21 +438,71 @@ function setupEventListeners() {
 
     qtyImageUrl.addEventListener('input', () => {
         const url = qtyImageUrl.value.trim();
-        activeScanImage = url;
+        if (!qtyImageUrl._allImageUrls) qtyImageUrl._allImageUrls = [];
+        if (url) {
+            if (qtyImageUrl._allImageUrls.length > 0) {
+                qtyImageUrl._allImageUrls[0] = url;
+            } else {
+                qtyImageUrl._allImageUrls.push(url);
+            }
+        }
+        activeScanImage = JSON.stringify(qtyImageUrl._allImageUrls);
         updateQtyPreviewImage(url);
+        renderImageSelectionThumbnails('qtyImageUrlThumbnails', qtyImageUrl, qtyImageUrl._allImageUrls, updateQtyPreviewImage);
     });
 
     // Fuzzy
-    createAsNewBtn.addEventListener('click', () => { closeModal(fuzzyModal); openQtyModal(activeScanName, activeScanBarcode, activeScanSku); });
+    createAsNewBtn.addEventListener('click', () => { closeModal(fuzzyModal); openQtyModal(activeScanName, activeScanBarcode, activeScanSku, activeScanImage, activeScanImageUrls); });
     cancelFuzzyBtn.addEventListener('click', () => closeModal(fuzzyModal));
 
     // Register
     cancelRegisterBtn.addEventListener('click', () => closeModal(registerModal));
     confirmRegisterBtn.addEventListener('click', submitRegistration);
+    registerImage.addEventListener('input', () => {
+        const url = registerImage.value.trim();
+        if (!registerImage._allImageUrls) registerImage._allImageUrls = [];
+        if (url) {
+            if (registerImage._allImageUrls.length > 0) {
+                registerImage._allImageUrls[0] = url;
+            } else {
+                registerImage._allImageUrls.push(url);
+            }
+        }
+        renderImageSelectionThumbnails('registerImageThumbnails', registerImage, registerImage._allImageUrls);
+    });
 
     // Edit
     cancelEditBtn.addEventListener('click', () => closeModal(editModal));
     confirmEditBtn.addEventListener('click', submitEditUpdate);
+    editImage.addEventListener('input', () => {
+        const url = editImage.value.trim();
+        if (!editImage._allImageUrls) editImage._allImageUrls = [];
+        if (url) {
+            if (editImage._allImageUrls.length > 0) {
+                editImage._allImageUrls[0] = url;
+            } else {
+                editImage._allImageUrls.push(url);
+            }
+        }
+        renderImageSelectionThumbnails('editImageThumbnails', editImage, editImage._allImageUrls);
+    });
+
+    // Manual add input listener
+    const manProdImg = document.getElementById('manualProdImage');
+    if (manProdImg) {
+        manProdImg.addEventListener('input', () => {
+            const url = manProdImg.value.trim();
+            if (!manProdImg._allImageUrls) manProdImg._allImageUrls = [];
+            if (url) {
+                if (manProdImg._allImageUrls.length > 0) {
+                    manProdImg._allImageUrls[0] = url;
+                } else {
+                    manProdImg._allImageUrls.push(url);
+                }
+            }
+            renderImageSelectionThumbnails('manualProdImageThumbnails', manProdImg, manProdImg._allImageUrls);
+        });
+    }
 
     // Manage Categories
     const addCategoryBtn = document.getElementById('addCategoryBtn');
@@ -412,6 +567,8 @@ function setupEventListeners() {
                     const data = await res.json();
                     if (data.image_url) {
                         registerImage.value = data.image_url;
+                        registerImage._allImageUrls = data.image_urls || [data.image_url];
+                        renderImageSelectionThumbnails('registerImageThumbnails', registerImage, registerImage._allImageUrls);
                         status.textContent = '✅ Image found!';
                         status.style.color = 'var(--green)';
                     } else {
@@ -422,6 +579,52 @@ function setupEventListeners() {
             } catch (err) { status.textContent = ''; }
         }, 800);
     });
+
+    let manualNameTimeout = null;
+    const manualProdNameEl = document.getElementById('manualProdName');
+    const manualProdImageEl = document.getElementById('manualProdImage');
+    if (manualProdNameEl && manualProdImageEl) {
+        manualProdNameEl.addEventListener('input', () => {
+            clearTimeout(manualNameTimeout);
+            const name = manualProdNameEl.value.trim();
+            const status = document.getElementById('manualNameSearchStatus');
+            if (name.length < 3) { if (status) status.textContent = ''; return; }
+            if (status) {
+                status.textContent = '🔍 Waiting...';
+                status.style.color = 'var(--text-tertiary)';
+            }
+            manualNameTimeout = setTimeout(async () => {
+                if (status) {
+                    status.textContent = '⚡ Searching...';
+                    status.style.color = 'var(--primary)';
+                }
+                try {
+                    const res = await fetch(`${BASE_URL}/api/search/image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.image_url) {
+                            manualProdImageEl.value = data.image_url;
+                            manualProdImageEl._allImageUrls = data.image_urls || [data.image_url];
+                            renderImageSelectionThumbnails('manualProdImageThumbnails', manualProdImageEl, manualProdImageEl._allImageUrls);
+                            if (status) {
+                                status.textContent = '✅ Image found!';
+                                status.style.color = 'var(--green)';
+                            }
+                        } else {
+                            if (status) {
+                                status.textContent = '❌ No image found.';
+                                status.style.color = 'var(--red)';
+                            }
+                        }
+                    }
+                } catch (err) { if (status) status.textContent = ''; }
+            }, 800);
+        });
+    }
 
     // Delete
     document.getElementById('cancelDeleteBtn').addEventListener('click', () => closeModal(deletePromptModal));
@@ -554,8 +757,9 @@ function renderInventory() {
         if (qty === 0) { badgeClass = 'stock-out'; badgeText = 'Out of stock'; }
         else if (qty <= 5) { badgeClass = 'stock-low'; badgeText = `${qty} units`; }
 
-        const imgHtml = item.image_url
-            ? `<img src="${item.image_url}" class="prod-img" onerror="this.onerror=null; this.parentNode.innerHTML='<div class=\\'prod-img-placeholder\\'>📦</div>';">`
+        const primaryImg = getPrimaryImage(item.image_url);
+        const imgHtml = primaryImg
+            ? `<img src="${primaryImg}" class="prod-img" onerror="this.onerror=null; this.parentNode.innerHTML='<div class=\\'prod-img-placeholder\\'>📦</div>';">`
             : `<div class="prod-img-placeholder">📦</div>`;
 
         const escapedName = item.name.replace(/'/g, "\\'");
@@ -716,17 +920,20 @@ async function handleScannedBarcode(barcode) {
             addLog(`Web match: "${data.web_name}" — similar exists.`, 'warning');
             activeScanName = data.web_name;
             activeScanImage = data.image_url || '';
+            activeScanImageUrls = data.image_urls || (data.image_url ? [data.image_url] : []);
             activeScanSku = '';
             openFuzzyModal(data.web_name, data.similar);
         } else if (data.status === 'new_web_match') {
             addLog(`Resolved: "${data.web_name}"`, 'success');
             activeScanName = data.web_name;
             activeScanImage = data.image_url || '';
+            activeScanImageUrls = data.image_urls || (data.image_url ? [data.image_url] : []);
             activeScanSku = data.sku;
-            openQtyModal(data.web_name, barcode, data.sku, data.image_url);
+            openQtyModal(data.web_name, barcode, data.sku, data.image_url, data.image_urls);
         } else {
             addLog(`Barcode "${barcode}" not recognized.`, 'warning');
             activeScanImage = '';
+            activeScanImageUrls = [];
             openRegisterModal(barcode);
         }
     } catch (err) {
@@ -740,23 +947,40 @@ function openModal(el) { el.classList.add('active'); }
 function closeModal(el) { el.classList.remove('active'); }
 
 // --- Qty Modal ---
-function openQtyModal(name, barcode, sku, image_url = '') {
+function openQtyModal(name, barcode, sku, image_url = '', image_urls = null) {
     qtyModalProdName.textContent = name;
     qtyModalBarcode.textContent = barcode;
     qtyInput.value = '1';
     activeScanName = name;
     activeScanBarcode = barcode;
     activeScanSku = sku;
-    activeScanImage = image_url;
-    qtyImageUrl.value = image_url || '';
     
     // Look up if product already exists to prefill details
     const existing = inventory.find(p => p.sku === sku || p.barcode === barcode);
+    const dbImg = existing ? existing.image_url : '';
+    
+    // Determine image list:
+    let allImgs = [];
+    if (image_urls && image_urls.length > 0) {
+        allImgs = image_urls;
+    } else if (dbImg) {
+        allImgs = getAllImages(dbImg);
+    } else if (image_url) {
+        allImgs = getAllImages(image_url);
+    }
+    
+    const primaryImg = allImgs.length > 0 ? allImgs[0] : (image_url || '');
+    qtyImageUrl.value = primaryImg;
+    qtyImageUrl._allImageUrls = allImgs;
+    activeScanImage = JSON.stringify(allImgs); // Keep activeScanImage as serialized array
+    
     qtyIntakePrice.value = (existing && existing.intake_price) ? existing.intake_price : '';
     qtySellingPrice.value = (existing && existing.selling_price) ? existing.selling_price : '';
     qtyCategory.value = (existing && existing.category) ? existing.category : activeScanCategory;
     
-    updateQtyPreviewImage(image_url);
+    updateQtyPreviewImage(primaryImg);
+    renderImageSelectionThumbnails('qtyImageUrlThumbnails', qtyImageUrl, allImgs, updateQtyPreviewImage);
+    
     openModal(qtyModal);
     qtyInput.focus();
 }
@@ -785,12 +1009,28 @@ async function submitQuantityUpdate() {
     const sellingVal = parseFloat(qtySellingPrice.value.trim());
     const categoryVal = qtyCategory.value.trim() || 'General';
     
+    let finalImageUrl = qtyImageUrl.value.trim();
+    if (qtyImageUrl._allImageUrls && qtyImageUrl._allImageUrls.length > 0) {
+        const currentVal = qtyImageUrl.value.trim();
+        const urls = [...qtyImageUrl._allImageUrls];
+        if (currentVal && urls.indexOf(currentVal) === -1) {
+            urls.unshift(currentVal);
+        } else if (currentVal && urls.indexOf(currentVal) > 0) {
+            const index = urls.indexOf(currentVal);
+            urls.splice(index, 1);
+            urls.unshift(currentVal);
+        }
+        finalImageUrl = JSON.stringify(urls);
+    } else if (activeScanImage) {
+        finalImageUrl = activeScanImage;
+    }
+    
     const payload = {
         barcode: activeScanBarcode,
         sku: activeScanSku,
         name: activeScanName,
         quantity: qty,
-        image_url: qtyImageUrl.value.trim() || activeScanImage,
+        image_url: finalImageUrl,
         category: categoryVal
     };
     if (!isNaN(intakeVal)) {
@@ -837,7 +1077,7 @@ function openFuzzyModal(webName, similarProducts) {
         `;
         opt.addEventListener('click', () => {
             closeModal(fuzzyModal);
-            openQtyModal(prod.name, activeScanBarcode, prod.sku, prod.image_url || activeScanImage);
+            openQtyModal(prod.name, activeScanBarcode, prod.sku, prod.image_url || activeScanImage, activeScanImageUrls);
         });
         fuzzyOptionsList.appendChild(opt);
     });
@@ -869,12 +1109,26 @@ async function submitRegistration() {
     const sellingVal = parseFloat(registerSellingPrice.value.trim());
     const categoryVal = registerCategory.value.trim() || 'General';
     
+    let finalImageUrl = registerImage.value.trim();
+    if (registerImage._allImageUrls && registerImage._allImageUrls.length > 0) {
+        const currentVal = registerImage.value.trim();
+        const urls = [...registerImage._allImageUrls];
+        if (currentVal && urls.indexOf(currentVal) === -1) {
+            urls.unshift(currentVal);
+        } else if (currentVal && urls.indexOf(currentVal) > 0) {
+            const index = urls.indexOf(currentVal);
+            urls.splice(index, 1);
+            urls.unshift(currentVal);
+        }
+        finalImageUrl = JSON.stringify(urls);
+    }
+    
     const payload = {
         barcode: activeScanBarcode,
         sku,
         name,
         quantity: qty,
-        image_url: registerImage.value.trim(),
+        image_url: finalImageUrl,
         category: categoryVal
     };
     if (!isNaN(intakeVal)) {
@@ -914,10 +1168,18 @@ function openEditModal(sku) {
     editBarcode.value = item.barcode;
     editName.value = item.name;
     editQty.value = item.quantity;
-    editImage.value = item.image_url || '';
+    
+    const allImgs = getAllImages(item.image_url);
+    const primaryImg = allImgs.length > 0 ? allImgs[0] : (item.image_url || '');
+    editImage.value = primaryImg;
+    editImage._allImageUrls = allImgs;
+    
     editIntakePrice.value = item.intake_price || '';
     editSellingPrice.value = item.selling_price || '';
     editCategory.value = item.category || 'General';
+    
+    renderImageSelectionThumbnails('editImageThumbnails', editImage, allImgs);
+    
     openModal(editModal);
 }
 
@@ -931,6 +1193,20 @@ async function submitEditUpdate() {
     const sellingVal = parseFloat(editSellingPrice.value.trim()) || 0.0;
     const categoryVal = editCategory.value.trim() || 'General';
 
+    let finalImageUrl = editImage.value.trim();
+    if (editImage._allImageUrls && editImage._allImageUrls.length > 0) {
+        const currentVal = editImage.value.trim();
+        const urls = [...editImage._allImageUrls];
+        if (currentVal && urls.indexOf(currentVal) === -1) {
+            urls.unshift(currentVal);
+        } else if (currentVal && urls.indexOf(currentVal) > 0) {
+            const index = urls.indexOf(currentVal);
+            urls.splice(index, 1);
+            urls.unshift(currentVal);
+        }
+        finalImageUrl = JSON.stringify(urls);
+    }
+
     try {
         const res = await fetch(`${BASE_URL}/api/inventory/edit`, {
             method: 'POST',
@@ -940,7 +1216,7 @@ async function submitEditUpdate() {
                 barcode: editBarcode.value.trim(),
                 name,
                 quantity: qty,
-                image_url: editImage.value.trim(),
+                image_url: finalImageUrl,
                 intake_price: intakeVal,
                 selling_price: sellingVal,
                 category: categoryVal
@@ -1387,7 +1663,19 @@ function initManualProductFeature() {
             const intakePrice = parseFloat(manualProdIntake.value) || 0.0;
             const sellingPrice = parseFloat(manualProdSelling.value) || 0.0;
             const category = manualProdCategory.value;
-            const imageUrl = manualProdImage.value.trim();
+            let finalImageUrl = manualProdImage.value.trim();
+            if (manualProdImage._allImageUrls && manualProdImage._allImageUrls.length > 0) {
+                const currentVal = manualProdImage.value.trim();
+                const urls = [...manualProdImage._allImageUrls];
+                if (currentVal && urls.indexOf(currentVal) === -1) {
+                    urls.unshift(currentVal);
+                } else if (currentVal && urls.indexOf(currentVal) > 0) {
+                    const index = urls.indexOf(currentVal);
+                    urls.splice(index, 1);
+                    urls.unshift(currentVal);
+                }
+                finalImageUrl = JSON.stringify(urls);
+            }
 
             if (!name || !sku || !barcode || sellingPrice <= 0) {
                 showToast('Invalid manual product details', 'error');
@@ -1402,7 +1690,7 @@ function initManualProductFeature() {
                 intake_price: intakePrice,
                 selling_price: sellingPrice,
                 category,
-                image_url: imageUrl
+                image_url: finalImageUrl
             };
 
             try {
@@ -1427,6 +1715,9 @@ function initManualProductFeature() {
                     manualProdIntake.value = '';
                     manualProdSelling.value = '';
                     manualProdImage.value = '';
+                    manualProdImage._allImageUrls = [];
+                    const manThumbnails = document.getElementById('manualProdImageThumbnails');
+                    if (manThumbnails) manThumbnails.innerHTML = '';
                     populateManualCodes();
                 } else {
                     showToast('Failed to add manual product', 'error');
@@ -1491,9 +1782,10 @@ function showBarcodesSheet() {
         nameEl.style.overflow = 'hidden';
         card.appendChild(nameEl);
 
-        if (prod.image_url) {
+        const primaryImg = getPrimaryImage(prod.image_url);
+        if (primaryImg) {
             const imgEl = document.createElement('img');
-            imgEl.src = prod.image_url;
+            imgEl.src = primaryImg;
             imgEl.style.maxWidth = '60px';
             imgEl.style.maxHeight = '60px';
             imgEl.style.objectFit = 'contain';
