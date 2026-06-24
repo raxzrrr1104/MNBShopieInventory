@@ -1,36 +1,48 @@
 # MNB Shopie — Enterprise Inventory & Billing Management System
 
-An enterprise-grade, mobile-first inventory management, barcode scanning, and billing dashboard built with Python/Flask, Vanilla JS, and Supabase. The system is designed to allow billing personnel to manage stock, scan items via a camera or manual barcode input, complete checkouts, print/email PDF receipts, and track sales performance in real-time.
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/flask-v3.0-green.svg)](https://flask.palletsprojects.com/)
+[![Supabase](https://img.shields.io/badge/database-Supabase--PostgreSQL-emerald.svg)](https://supabase.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+An enterprise-grade, mobile-first inventory management, barcode scanning, and billing dashboard built with a Python/Flask backend, Vanilla JS frontend, and Supabase (PostgreSQL) database. The system is designed to allow billing personnel to manage stock, scan items via a camera or manual barcode input, complete checkouts, print/email PDF receipts, log business nominal expenses, and track sales performance in real-time.
 
 ---
 
-## 🌟 Key Features
+## 🌟 Core Highlights & Showcase Value
 
-### 📋 Stock Dashboard
-- **Intake Mode**: Fast-increment stock by barcode scan, search similar titles to prevent duplicate SKU generation, and register new products.
-- **Bill Mode**: Quick addition of inventory items directly to a checkout cart.
-- **Smart Filtering**: Instant categorization of stock levels: In Stock, Low Stock, and Out of Stock.
-- **Search Engine**: Real-time fuzzy query filtering of SKUs, barcodes, and names.
-- **Stock Distribution Chart**: Interactive Chart.js visualization of current category distributions.
+* **Zero-Dependency Camera Scanning**: Direct camera stream integration using the `html5-qrcode` engine.
+* **Autonomous Web Scraping & Metadata Parsing**: Instant SKU auto-discovery through Open Food Facts, UPCitemdb, Open Library (ISBN), and DuckDuckGo Lite search scrapers to pull product names and images for new items automatically.
+* **Relational Invoice Auditing Ledger**: Built with parent checkout invoices (`bills` table), detailed line items (`bill_items` table), and returns auditing logs (`transaction_logs` table) with cascade deletion triggers.
+* **Automated PDF Compiler & Mail dispatcher**: Custom ReportLab PDF invoice builder. Automatically compiles, formats, and emails revised receipts to customers during checkouts, refunds, or swaps.
+* **Nominal Expenses Log & True Net Analytics**: Dedicated panel for logging operational expenses (rent, utility bills, salaries). Integrates directly with Business Analytics to deduct costs from gross profit for true Net Profit tracking.
 
-### 📷 Scanner Hub
-- **Camera Scanning**: Integration with `html5-qrcode` to enable barcode scanning via front/rear cameras on both desktop and mobile devices.
-- **Web-based Auto-Lookup**: Automatic scanning querying Open Food Facts, UPCitemdb, Open Library (ISBN), and fallback search scrapers to pull product names and images for new items automatically.
-- **Manual Input**: Fallback manual barcode or SKU input.
+---
 
-### 🛒 Billing & PDF Checkout
-- **Interactive Cart**: Supports custom quantity modifications and pricing updates on the fly during checkouts.
-- **Self-Generating Receipts**: Compiles transaction receipts with tabular structures and totals using ReportLab in Python.
-- **Receipt Emailing**: Sends the generated PDF directly to the customer's inbox via secure SMTP.
+## 📋 Detailed Feature Walkthrough
 
-### 📊 Business Analytics
-- **Live Performance KPIs**: Visual indicators for Gross Revenue, Net Profit, Items Sold, and Profit Margins.
-- **Trends & Contribution charts**: Line charts representing revenue/profit progression, top performing products, and profit share doughnut charts.
-- **Sales Logging**: Dynamic breakdown table of transactions with CSV exports.
+### 1. Stock Dashboard
+* **Intake Mode**: Fast-increment stock by barcode scan, search similar titles to prevent duplicate SKU generation, and register new products.
+* **Bill Mode**: Quick addition of inventory items directly to a checkout cart.
+* **Smart Filtering**: Instant categorization of stock levels: In Stock, Low Stock, and Out of Stock.
+* **Search Engine**: Real-time fuzzy query filtering of SKUs, barcodes, and names.
+* **Stock Distribution Chart**: Interactive Chart.js visualization of current category distributions.
 
-### 🔒 Access Security Gate (New)
-- **Session Protection**: Flask cookie sessions block all application page access and API requests unless a valid authenticated session is present.
-- **Premium Glassmorphic Login**: Custom styled entrance page with error-handling shake animations.
+### 2. Billing & Returns Wizard
+* **Interactive Cart**: Supports custom quantity modifications and pricing updates on the fly during checkouts.
+* **PDF Receipt Downloader**: Integrated JS downloader that fetches PDF bytes via secure AJAX, bypassing browser HTTPS download blocks on self-signed localhost environments.
+* **Return & Swap constraints**: Enforces validation constraints preventing refunds/swaps on already returned items or replacement items. Re-opens and refreshes the invoice modal in-place.
+* **Dynamic 'EXCHANGED' Invoice Status**: Automatically updates and flags invoice status dynamically if a product exchange is executed.
+
+### 3. Business Analytics & Expenses Log
+* **Performance KPIs**: Visual indicators for Gross Revenue, Net Profit (true net after expenses), Items Sold, and Profit Margins.
+* **Trends & Contribution charts**: Line charts representing revenue/profit progression, top performing products, and profit share doughnut charts.
+* **Expenses Ledger**: Full CRUD panel in `analytics.html` to log name and total cost of business nominals, showing live lists and net profit updates.
+* **Sales Logging**: Dynamic breakdown table of transactions with CSV exports.
+
+### 4. Access Security Gate
+* **Session Protection**: Flask cookie sessions block all application page access and API requests unless a valid authenticated session is present.
+* **Premium Glassmorphic Login**: Custom styled entrance page with error-handling shake animations.
 
 ---
 
@@ -41,7 +53,7 @@ An enterprise-grade, mobile-first inventory management, barcode scanning, and bi
                      │   Web Browser    │
                      │  (Desktop/Mobile)│
                      └────────┬─────────┘
-                              │ HTTPS
+                              │ HTTPS (Self-Signed Dev Certificate)
                               ▼
                      ┌──────────────────┐
                      │  Flask Server    │
@@ -52,7 +64,7 @@ An enterprise-grade, mobile-first inventory management, barcode scanning, and bi
             ▼                 ▼                 ▼
      ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
      │  Supabase   │   │ ReportLab   │   │ SMTP Relay  │
-     │  (Database) │   │ (PDF Engine)│   │  (Emails)   │
+     │ (PostgreSQL)│   │ (PDF Engine)│   │  (Emails)   │
      └─────────────┘   └─────────────┘   └─────────────┘
 ```
 
@@ -65,25 +77,23 @@ An enterprise-grade, mobile-first inventory management, barcode scanning, and bi
 
 ---
 
-## 📁 File Directory Map
+## 📁 Repository Directory Structure
 
-- [`server.py`](file:///Users/darshan/Desktop/ScanNGo/server.py): Main Flask backend router. Holds all API endpoints, auth middleware (`before_request`), daily email scheduler, Supabase integrations, and PDF generator code.
-- [`index.html`](file:///Users/darshan/Desktop/ScanNGo/index.html): The main layout of the application serving the Stock Dashboard, modals, and scanner workflows.
-- [`analytics.html`](file:///Users/darshan/Desktop/ScanNGo/analytics.html): Dynamic analytical interface displaying sales metrics, top performers, and transaction logs.
-- [`login.html`](file:///Users/darshan/Desktop/ScanNGo/login.html): Glassmorphic login gate page.
-- [`app.js`](file:///Users/darshan/Desktop/ScanNGo/app.js): Frontend client logic managing scanning camera instantiations, cart additions, modal views, settings updates, search operations, and dashboard UI rendering.
-- [`style.css`](file:///Users/darshan/Desktop/ScanNGo/style.css): Global stylesheet containing CSS custom properties (variables), grid setups, responsive queries, and UI components.
-- [`start.sh`](file:///Users/darshan/Desktop/ScanNGo/start.sh): Local developer script to start the server. It frees port 3000, checks the virtual environment, and runs Flask.
-- [`setup.py`](file:///Users/darshan/Desktop/ScanNGo/setup.py): Set up local SQLite tables (historical/fallback configurations).
-- [`migrate_to_supabase.py`](file:///Users/darshan/Desktop/ScanNGo/migrate_to_supabase.py): Migration helper script to sync files from local CSV sheets onto Supabase table definitions.
-- [`setup_email.py`](file:///Users/darshan/Desktop/ScanNGo/setup_email.py): Setup CLI helper to configure SMTP values in environment settings.
-- [`vercel.json`](file:///Users/darshan/Desktop/ScanNGo/vercel.json): Server deployment configurations for Vercel.
+* [`server.py`](./server.py): Main Flask backend router. Holds all API endpoints, auth middleware (`before_request`), daily email scheduler, Supabase integrations, and PDF generator code.
+* [`index.html`](./index.html): The main layout of the application serving the Stock Dashboard, modals, and scanner workflows.
+* [`analytics.html`](./analytics.html): Dynamic analytical interface displaying sales metrics, top performers, nominal expenses CRUD, and transaction logs.
+* [`login.html`](./login.html): Glassmorphic login gate page.
+* [`app.js`](./app.js): Frontend client logic managing scanning camera instantiations, cart additions, modal views, settings updates, search operations, and dashboard UI rendering.
+* [`style.css`](./style.css): Global stylesheet containing CSS custom properties (variables), grid setups, responsive queries, and UI components.
+* [`start.sh`](./start.sh): Local developer script to start the server. It frees port 3000, checks the virtual environment, and runs Flask.
+* [`schema.sql`](./schema.sql): Standard table structures (inventory, sales, categories).
+* [`schema_billing.sql`](./schema_billing.sql): Relational table structures (bills, bill_items, transaction_logs, expenses).
 
 ---
 
 ## ⚙️ Environment Configuration (`.env`)
 
-To run the application, configure a `.env` file in the root directory containing the following parameters:
+Configure a `.env` file in the root directory containing the following parameters:
 
 ```env
 # Supabase Database Credentials
@@ -100,66 +110,129 @@ LOGIN_PASS=MNBShopie@123
 
 ---
 
-## 🗄️ Supabase Table Structures
+## 🗄️ Supabase Table Migrations
 
-Ensure the following tables are provisioned in your Supabase database:
+Run the following SQL scripts in your Supabase SQL Editor to provision the required table schemas:
 
-### 1. `inventory` Table
-- `sku` (text, Primary Key)
-- `barcode` (text, Index)
-- `name` (text)
-- `quantity` (integer)
-- `image_url` (text)
-- `intake_price` (numeric/float)
+### Core Tables (`schema.sql`)
+```sql
+CREATE TABLE IF NOT EXISTS inventory (
+    sku text PRIMARY KEY,
+    barcode text,
+    name text,
+    quantity integer DEFAULT 0,
+    image_url text,
+    intake_price numeric(10,2) DEFAULT 0.00,
+    selling_price numeric(10,2) DEFAULT 0.00,
+    category text DEFAULT 'General'
+);
+CREATE INDEX IF NOT EXISTS idx_inventory_barcode ON inventory(barcode);
 
-### 2. `sales` Table
-- `id` (integer, Auto-Incrementing Primary Key)
-- `date` (text)
-- `product_name` (text)
-- `sku` (text)
-- `intake` (numeric/float)
-- `sold_price` (numeric/float)
-- `profit` (numeric/float)
-- `quantity` (integer)
+CREATE TABLE IF NOT EXISTS sales (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    date text,
+    product_name text,
+    sku text,
+    intake numeric(10,2) DEFAULT 0.00,
+    sold_price numeric(10,2) DEFAULT 0.00,
+    profit numeric(10,2) DEFAULT 0.00,
+    quantity integer DEFAULT 1,
+    category text DEFAULT 'General'
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+    name text PRIMARY KEY
+);
+INSERT INTO categories (name) VALUES ('General') ON CONFLICT DO NOTHING;
+```
+
+### Relational Billing & Expenses (`schema_billing.sql`)
+```sql
+CREATE TABLE IF NOT EXISTS bills (
+    bill_no text PRIMARY KEY,
+    date text NOT NULL,
+    customer_email text,
+    total_amount numeric(10,2) NOT NULL,
+    discount_type text DEFAULT 'none',
+    discount_value numeric(10,2) DEFAULT 0.00,
+    net_amount numeric(10,2) NOT NULL,
+    status text DEFAULT 'completed'             -- 'completed', 'partially_refunded', 'exchanged', 'refunded'
+);
+
+CREATE TABLE IF NOT EXISTS bill_items (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    bill_no text REFERENCES bills(bill_no) ON DELETE CASCADE,
+    sku text REFERENCES inventory(sku) ON DELETE RESTRICT,
+    product_name text NOT NULL,
+    quantity integer NOT NULL CHECK (quantity > 0),
+    original_price numeric(10,2) NOT NULL,
+    discount_share numeric(10,2) DEFAULT 0.00,
+    final_sold_price numeric(10,2) NOT NULL,
+    intake_price numeric(10,2) DEFAULT 0.00,
+    returned_quantity integer DEFAULT 0 CHECK (returned_quantity >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS transaction_logs (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    parent_bill_no text REFERENCES bills(bill_no) ON DELETE CASCADE,
+    type text NOT NULL,                         -- 'refund' or 'exchange'
+    date text NOT NULL,
+    items_involved jsonb NOT NULL,              -- e.g., [{"sku": "MAN-1", "qty": 1, "action": "returned"}]
+    cash_delta numeric(10,2) DEFAULT 0.00
+);
+
+CREATE TABLE IF NOT EXISTS expenses (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    name text NOT NULL,
+    amount numeric(10,2) NOT NULL,
+    date text NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_bill_items_bill_no ON bill_items(bill_no);
+CREATE INDEX IF NOT EXISTS idx_transaction_logs_bill ON transaction_logs(parent_bill_no);
+```
 
 ---
 
-## 🚀 Local Installation & Running Instructions
+## 🚀 Local Setup & Installation
 
 ### 1. Prerequisites
-Ensure you have Python 3.9 or higher installed.
+Make sure you have **Python 3.9+** and **Pip** installed on your system.
 
-### 2. Initialize Virtual Environment & Install Dependencies
+### 2. Clone Repository & Setup Virtual Environment
 ```bash
-# Create environment
+# Clone the repository
+git clone https://github.com/raxzrrr1104/MNBShopieInventory.git
+cd MNBShopieInventory
+
+# Create virtual environment
 python3 -m venv .venv
 
-# Activate environment
+# Activate virtual environment
 source .venv/bin/activate
 
 # Install required python packages
 pip install -r requirements.txt
 ```
 
-### 3. Startup the Server
-Run the local boot script to free port `3000` and start the server:
+### 3. Start the Flask Server
+Boot the local server using the startup script which cleans port `3000` automatically:
 ```bash
 chmod +x start.sh
 ./start.sh
 ```
 
-### 4. Self-Signed Developer Certificate
-The backend runs in **secure HTTPS mode** by generating a self-signed SSL certificate on boot. This is mandatory to allow browser permission access to the camera (scanning) when viewing the dashboard from other devices on the same local network.
-- When opening the URL `https://localhost:3000`, your browser will show a warning page ("Your connection is not private").
-- Click **Advanced** and then **Proceed to localhost (unsafe)** to enter the dashboard.
+### 4. Accessing the Dashboard & Bypassing local SSL warnings
+The local developer environment serves assets over **secure HTTPS mode** by generating a self-signed SSL certificate on boot. This is mandatory to allow browser webcam permission access to the barcode scanner from mobile devices on the same local network.
+1. When opening `https://localhost:3000`, the browser will show a warning page ("Your connection is not private").
+2. Click **Advanced** and then click **Proceed to localhost (unsafe)**.
+3. Access the dashboard securely!
 
 ---
 
-## 🔑 Login Gate Details
-- **User ID**: `MNBUser`
-- **Password**: `MNBShopie@123`
-
-The authentication is session-based, keeping users logged in locally across tabs. When finished, clicking the red **Logout** option on the navigation bar destroys the session securely and redirects the client.
+## 🔑 Default Login Credentials
+* **User ID**: `MNBUser`
+* **Password**: `MNBShopie@123`
 
 ---
-Created with <3 by Mohit Sherkhane
+Developed by **Mohit Sherkhane**
