@@ -161,6 +161,7 @@ const qtyInput = document.getElementById('qtyInput');
 const qtyMinus = document.getElementById('qtyMinus');
 const qtyPlus = document.getElementById('qtyPlus');
 const qtyModalProdName = document.getElementById('qtyModalProdName');
+const qtyModalNameInput = document.getElementById('qtyModalNameInput');
 const qtyModalBarcode = document.getElementById('qtyModalBarcode');
 const qtyIntakePrice = document.getElementById('qtyIntakePrice');
 const qtySellingPrice = document.getElementById('qtySellingPrice');
@@ -435,6 +436,10 @@ function setupEventListeners() {
     qtyPlus.addEventListener('click', () => { qtyInput.value = (parseInt(qtyInput.value) || 1) + 1; });
     cancelQtyBtn.addEventListener('click', () => closeModal(qtyModal));
     confirmQtyBtn.addEventListener('click', submitQuantityUpdate);
+
+    qtyModalNameInput.addEventListener('input', () => {
+        qtyModalProdName.textContent = qtyModalNameInput.value.trim() || '—';
+    });
 
     qtyImageUrl.addEventListener('input', () => {
         const url = qtyImageUrl.value.trim();
@@ -951,6 +956,7 @@ function closeModal(el) { el.classList.remove('active'); }
 // --- Qty Modal ---
 function openQtyModal(name, barcode, sku, image_url = '', image_urls = null) {
     qtyModalProdName.textContent = name;
+    qtyModalNameInput.value = name;
     qtyModalBarcode.textContent = barcode;
     qtyInput.value = '1';
     activeScanName = name;
@@ -1030,7 +1036,7 @@ async function submitQuantityUpdate() {
     const payload = {
         barcode: activeScanBarcode,
         sku: activeScanSku,
-        name: activeScanName,
+        name: qtyModalNameInput.value.trim() || activeScanName,
         quantity: qty,
         image_url: finalImageUrl,
         category: categoryVal
