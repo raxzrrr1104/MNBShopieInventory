@@ -21,4 +21,4 @@ urllib3==2.6.3
 Werkzeug==3.1.8
 zipp==3.23.1
 reportlab==4.1.0
-aws-lambda-wsgi==1.1.2
+aws-lambda-wsgi==0.0.6
