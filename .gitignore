@@ -21,3 +21,7 @@ inventory.csv
 
 # OS metadata
 .DS_Store
+
+# Local Cloudflare Pages Workspace
+cloudflare-pages/
+
