@@ -1281,6 +1281,8 @@ def generate_bill_pdf(bill_no):
         # Subtotal, Discount, Net Paid rows
         total_amt = float(bill.get('total_amount', 0.0) or 0.0)
         net_amt = float(bill.get('net_amount', 0.0) or 0.0)
+        for log in logs:
+            net_amt += float(log.get('cash_delta', 0.0) or 0.0)
         discount_amt = total_amt - net_amt
         
         if discount_amt > 0:
@@ -1407,6 +1409,8 @@ def generate_bill_thermal_pdf(bill_no):
         # Calculate dynamic page height precisely to eliminate trailing white space
         total_amt = float(bill.get('total_amount', 0.0) or 0.0)
         net_amt = float(bill.get('net_amount', 0.0) or 0.0)
+        for log in logs:
+            net_amt += float(log.get('cash_delta', 0.0) or 0.0)
         discount_amt = total_amt - net_amt
         has_discount = discount_amt > 0
         
