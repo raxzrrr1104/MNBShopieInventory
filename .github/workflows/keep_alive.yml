@@ -1,0 +1,22 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Runs every 2 days at 00:00 UTC
+    - cron: '0 0 */2 * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Keep-Alive API Endpoint
+        run: |
+          echo "Pinging Cloudflare Pages / Supabase Keep-Alive Endpoint..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "https://mnb-shopie-inventory-cloudflare-pages.pages.dev/api/keep-alive")
+          echo "$RESPONSE"
+          if [[ "$RESPONSE" == *"HTTP_STATUS:200"* ]]; then
+            echo "Successfully pinged Supabase!"
+          else
+            echo "Warning: Keep-alive ping returned non-200 status code."
+          fi
